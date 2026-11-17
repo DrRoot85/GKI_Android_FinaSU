@@ -1,4 +1,4 @@
-name: Android 内核构建-自定义
+name: Custom Android Kernel Build
 
 permissions:
   contents: write
@@ -7,9 +7,9 @@ permissions:
 on:
   workflow_dispatch:
     inputs:
-      # ==================== 内核版本配置 ====================
+      # ==================== Kernel Version Configuration ====================
       kernel_version:
-        description: "内核版本"
+        description: "Kernel version"
         required: true
         type: choice
         options:
@@ -20,16 +20,16 @@ on:
           - "6.12"
           - "6.18"
         default: "5.10"
-      # 内核子版本：每个 Android + 内核组合独立下拉，仅对应组合生效，选后自动匹配安全补丁级别
-      # 同一内核对应多个 Android 版本时（5.10 -> 12/13、5.15 -> 13/14），
-      # 选中对应的非 auto 子版本即按该 Android 版本构建，全为 auto 时用默认映射
+      # Kernel sub-levels: each Android and kernel combination has its own dropdown. The selected sub-level applies only to that combination and automatically selects its security patch level.
+      # When a kernel version supports multiple Android versions (5.10 -> 12/13, 5.15 -> 13/14),
+      # selecting a non-auto sub-level builds for that Android version; if all are auto, the default mapping is used.
       sub_level_a12_5_10:
-        description: "Android 12-5.10 子版本 (选择后自动匹配安全补丁级别；仅 Android 12 + 内核 5.10 时生效)"
+        description: "Android 12-5.10 sub-level (automatically matches the security patch level; applies only to Android 12 + kernel 5.10 )"
         required: false
         type: choice
-        default: "auto (自动匹配最新安全补丁级别)"
+        default: "auto (automatically match the latest security patch level)"
         options:
-          - "auto (自动匹配最新安全补丁级别)"
+          - "auto (automatically match the latest security patch level)"
           - "43 (2021-08)"
           - "43 (2021-09)"
           - "43 (2021-10)"
@@ -69,12 +69,12 @@ on:
           - "lts (5.10.272)"
 
       sub_level_a13_5_10:
-        description: "Android 13-5.10 子版本 (选择后自动匹配安全补丁级别；仅 Android 13 + 内核 5.10 时生效)"
+        description: "Android 13-5.10 sub-level (automatically matches the security patch level; applies only to Android 13 + kernel 5.10 )"
         required: false
         type: choice
-        default: "auto (自动匹配最新安全补丁级别)"
+        default: "auto (automatically match the latest security patch level)"
         options:
-          - "auto (自动匹配最新安全补丁级别)"
+          - "auto (automatically match the latest security patch level)"
           - "107 (2022-04)"
           - "107 (2022-05)"
           - "107 (2022-06)"
@@ -118,12 +118,12 @@ on:
           - "lts (5.10.272)"
 
       sub_level_a13_5_15:
-        description: "Android 13-5.15 子版本 (选择后自动匹配安全补丁级别；仅 Android 13 + 内核 5.15 时生效)"
+        description: "Android 13-5.15 sub-level (automatically matches the security patch level; applies only to Android 13 + kernel 5.15 )"
         required: false
         type: choice
-        default: "auto (自动匹配最新安全补丁级别)"
+        default: "auto (automatically match the latest security patch level)"
         options:
-          - "auto (自动匹配最新安全补丁级别)"
+          - "auto (automatically match the latest security patch level)"
           - "41 (2022-06)"
           - "41 (2022-07)"
           - "41 (2022-08)"
@@ -162,12 +162,12 @@ on:
           - "lts (5.15.223)"
 
       sub_level_a14_5_15:
-        description: "Android 14-5.15 子版本 (选择后自动匹配安全补丁级别；仅 Android 14 + 内核 5.15 时生效)"
+        description: "Android 14-5.15 sub-level (automatically matches the security patch level; applies only to Android 14 + kernel 5.15 )"
         required: false
         type: choice
-        default: "auto (自动匹配最新安全补丁级别)"
+        default: "auto (automatically match the latest security patch level)"
         options:
-          - "auto (自动匹配最新安全补丁级别)"
+          - "auto (automatically match the latest security patch level)"
           - "110 (2023-06)"
           - "110 (2023-08)"
           - "110 (2023-09)"
@@ -194,12 +194,12 @@ on:
           - "lts (5.15.223)"
 
       sub_level_a14_6_1:
-        description: "Android 14-6.1 子版本 (选择后自动匹配安全补丁级别；仅 Android 14 + 内核 6.1 时生效)"
+        description: "Android 14-6.1 sub-level (automatically matches the security patch level; applies only to Android 14 + kernel 6.1 )"
         required: false
         type: choice
-        default: "auto (自动匹配最新安全补丁级别)"
+        default: "auto (automatically match the latest security patch level)"
         options:
-          - "auto (自动匹配最新安全补丁级别)"
+          - "auto (automatically match the latest security patch level)"
           - "25 (2023-06)"
           - "25 (2023-07)"
           - "25 (2023-08)"
@@ -235,12 +235,12 @@ on:
           - "lts (6.1.182)"
 
       sub_level_a15_6_6:
-        description: "Android 15-6.6 子版本 (选择后自动匹配安全补丁级别；仅 Android 15 + 内核 6.6 时生效)"
+        description: "Android 15-6.6 sub-level (automatically matches the security patch level; applies only to Android 15 + kernel 6.6 )"
         required: false
         type: choice
-        default: "auto (自动匹配最新安全补丁级别)"
+        default: "auto (automatically match the latest security patch level)"
         options:
-          - "auto (自动匹配最新安全补丁级别)"
+          - "auto (automatically match the latest security patch level)"
           - "50 (2024-10)"
           - "56 (2024-11)"
           - "57 (2024-12)"
@@ -261,12 +261,12 @@ on:
           - "lts (6.6.144)"
 
       sub_level_a16_6_12:
-        description: "Android 16-6.12 子版本 (选择后自动匹配安全补丁级别；仅 Android 16 + 内核 6.12 时生效)"
+        description: "Android 16-6.12 sub-level (automatically matches the security patch level; applies only to Android 16 + kernel 6.12 )"
         required: false
         type: choice
-        default: "auto (自动匹配最新安全补丁级别)"
+        default: "auto (automatically match the latest security patch level)"
         options:
-          - "auto (自动匹配最新安全补丁级别)"
+          - "auto (automatically match the latest security patch level)"
           - "23 (2025-06)"
           - "30 (2025-07)"
           - "38 (2025-08)"
@@ -278,20 +278,20 @@ on:
           - "lts (6.12.97)"
 
       sub_level_a17_6_18:
-        description: "Android 17-6.18 子版本 (选择后自动匹配安全补丁级别；仅 Android 17 + 内核 6.18 时生效)"
+        description: "Android 17-6.18 sub-level (automatically matches the security patch level; applies only to Android 17 + kernel 6.18 )"
         required: false
         type: choice
-        default: "auto (自动匹配最新安全补丁级别)"
+        default: "auto (automatically match the latest security patch level)"
         options:
-          - "auto (自动匹配最新安全补丁级别)"
+          - "auto (automatically match the latest security patch level)"
           - "20 (2026-04)"
           - "21 (2026-06)"
           - "32 (2026-09)"
           - "lts (6.18.39)"
 
-      # ==================== KernelSU 配置 ====================
+      # ==================== KernelSU Configuration ====================
       kernelsu_variant:
-        description: "KernelSU 变体"
+        description: "KernelSU variant"
         required: true
         type: choice
         options:
@@ -302,33 +302,33 @@ on:
         default: FinaSU
 
       build_channel:
-        description: "构建通道（正式=官方 Release 发行版，最新=上游最新提交）"
+        description: "Build channel (Stable = official Release; Latest = upstream HEAD)"
         required: false
         type: choice
         options:
-          - "正式 (Release)"
-          - "最新 (HEAD)"
-        default: "正式 (Release)"
+          - "Stable (Release)"
+          - "Latest (HEAD)"
+        default: "Stable (Release)"
 
-      # ==================== 可选配置 ====================
+      # ==================== Optional Configuration ====================
       version:
-        description: "自定义版本名 (可选)"
+        description: "Custom version name (optional)"
         required: false
         type: string
       build_time:
-        description: "自定义构建时间 (留空=自动获取当前北京时间) (示例 Tue Dec  1 08:10:00 UTC 2026)"
+        description: "Custom build time (leave blank to use the current Beijing time; example: Tue Dec  1 08:10:00 UTC 2026)"
         required: false
         type: string
         default: ""
 
-      # ==================== 选项配置 ====================
+      # ==================== Option Configuration ====================
       use_kpm:
-        description: "KPM 功能（仅SukiSU支持，开启未修补）"
+        description: "KPM feature (SukiSU only; enabling it leaves it unpatched)"
         required: false
         type: boolean
         default: false
       droidspaces:
-        description: "Droidspaces 容器支持 (5.10~6.6: 槽位补丁, 6.12: 开/关；带 NTSync 的选项会同时注入 NTSync)"
+        description: "Droidspaces container support (slot patches for 5.10–6.6; on/off for 6.12; options with NTSync also apply the NTSync patch)"
         required: false
         type: choice
         options:
@@ -341,61 +341,61 @@ on:
           - "345 (NTSync)"
         default: "off"
       artifact_upload_mode:
-        description: "构建产物上传模式"
+        description: "Build artifact upload mode"
         required: true
         type: choice
         options:
-          - "仅上传 AnyKernel3.zip"
-          - "上传全部"
-        default: "仅上传 AnyKernel3.zip"
+          - "AnyKernel3.zip only"
+          - "Upload all"
+        default: "AnyKernel3.zip only"
       ksu_mode:
-        description: "KernelSU / SUSFS 模式"
+        description: "KernelSU / SUSFS mode"
         required: true
         type: choice
         options:
-          - "关闭"
-          - "禁用SUSFS"
-          - "禁用KSU"
-        default: "关闭"
+          - "Disabled"
+          - "Disable SUSFS"
+          - "Disable KernelSU"
+        default: "Disabled"
 
-      # ==================== 功能开关 ====================
+      # ==================== Feature Toggles ====================
       use_zram:
-        description: "启用 ZRAM 压缩算法（仅 5.10~6.6，6.12/6.18 不支持）"
+        description: "Enable the ZRAM compression algorithm (supported only on 5.10–6.6; not supported on 6.12/6.18)"
         required: true
         type: boolean
         default: false
       use_bbg:
-        description: "启用 BBG 基带保护"
+        description: "Enable BBG baseband protection"
         required: true
         type: boolean
         default: false
       use_net_enhance:
-        description: "启用 网络增强 (BBRv3 + IPSet + Qdisc + CIFS)"
+        description: "Enable network enhancements (BBRv3 + IPSet + Qdisc + CIFS)"
         required: true
         type: boolean
         default: false
       use_rekernel:
-        description: "启用 Re-Kernel 驱动"
+        description: "Enable the Re-Kernel driver"
         required: false
         type: boolean
         default: false
       use_nomount:
-        description: "启用 NoMount 挂载元模块（需自行刷入配套模块）"
+        description: "Enable the NoMount mount metamodule (the matching module must be flashed separately)"
         required: false
         type: boolean
         default: false
       cve_2026_43499_patch:
-        description: "应用 CVE-2026-43499 rtmutex 修复链"
+        description: "Apply the CVE-2026-43499 rtmutex fix chain"
         required: false
         type: boolean
         default: false
       supp_op:
-        description: "启用 一加 骁龙8 Elite/Gen5 支持"
+        description: "Enable OnePlus Snapdragon 8 Elite / Gen 5 support"
         required: false
         type: boolean
         default: false
       skip_incompatible:
-        description: "功能不兼容或无法使用时自动跳过该功能（不中断构建）"
+        description: "Automatically skip incompatible or unavailable features without stopping the build"
         required: false
         type: boolean
         default: true
@@ -409,10 +409,10 @@ jobs:
       kernel_full: ${{ steps.resolve.outputs.kernel_full }}
       os_patch_level: ${{ steps.resolve.outputs.os_patch_level }}
     steps:
-      - name: 检出版本数据
+      - name: Check out version data
         uses: actions/checkout@v7
 
-      - name: 解析安全补丁级别
+      - name: Resolve security patch level
         id: resolve
         env:
           KERNEL_VERSION: ${{ inputs.kernel_version }}
@@ -440,9 +440,9 @@ jobs:
               "6.12": "android16",
               "6.18": "android17",
           }
-          # 同一内核版本可能有多个 Android 版本（android13-5.10、android14-5.15 等），
-          # 由对应组合的子版本下拉决定：选中非 auto 项即按该 Android 版本构建，
-          # 全部保持 auto 时使用默认映射。
+          # A kernel version may support multiple Android versions (for example,
+          # android13-5.10 and android14-5.15). The selected sub-level determines
+          # the Android version; if all choices are auto, use the default mapping.
           android_candidates = {
               "5.10": ["android12", "android13"],
               "5.15": ["android13", "android14"],
@@ -453,7 +453,7 @@ jobs:
           }
           candidates = android_candidates.get(kernel_version)
           if not candidates:
-              print(f"::error::未适配的内核版本: {kernel_version}")
+              print(f"::error::Unsupported kernel version: {kernel_version}")
               sys.exit(1)
 
           def sub_level_key(android):
@@ -467,34 +467,35 @@ jobs:
                   selected.append((android, value))
 
           if len(selected) > 1:
-              print("::warning::同时选择了多个 Android 版本的子版本: "
+              print("::warning::Sub-levels for multiple Android versions were selected at once: "
                     + ", ".join("%s=%s" % item for item in selected)
-                    + f"，使用 {selected[0][0]}")
+                    + f", using {selected[0][0]}")
           if selected:
               android_version, sub_level_input = selected[0]
           else:
               android_version = android_map[kernel_version]
               sub_level_input = os.environ.get(sub_level_key(android_version), "").strip()
               if not sub_level_input:
-                  print(f"::warning::{sub_level_key(android_version)} 未设置，回退到 auto")
+                  print(f"::warning::{sub_level_key(android_version)} is not set; falling back to auto")
 
           data_path = Path("data") / android_version / f"{kernel_version}.json"
 
           if not data_path.exists():
-              print(f"::error::未找到版本数据: {data_path}")
+              print(f"::error::Version data not found: {data_path}")
               sys.exit(1)
 
           with data_path.open("r", encoding="utf-8") as f:
               data = json.load(f)
 
-          # 按子版本反查安全补丁级别（sub_level_input 已按上面的 Android 候选确定）
+          # Look up the security patch level by sub-level; sub_level_input has
+          # already been matched to an Android candidate above.
           if sub_level_input and not sub_level_input.startswith("auto"):
-              # 按子版本反查安全补丁级别，如 "138 (2025-06)" -> 2025-06
+              # Resolve the security patch level from the sub-level, e.g. "138 (2025-06)" -> 2025-06.
               token = sub_level_input.split()[0]
               if token == "lts":
                   kernel_full = data.get("lts")
                   if not kernel_full:
-                      print(f"::error::{android_version} / {kernel_version} 缺少 LTS 版本数据")
+                      print(f"::error::{android_version} / {kernel_version} LTS version data is missing")
                       sys.exit(1)
                   sub_level = "X"
                   patch_level = "lts"
@@ -504,37 +505,37 @@ jobs:
                       if entry.get("kernel") == f"{kernel_version}.{token}"
                   ]
                   if not matches:
-                      # 同一内核版本跨多个 Android 版本时，下拉列表可能不含当前组合的
-                      # 子版本；回退到该组合的最新月度条目，避免硬失败
+                      # When a kernel version is shared by Android versions, its dropdown may
+                      # not contain this combination's sub-level; fall back to the latest monthly entry.
                       entries = data.get("entries", [])
                       if not entries:
-                          print(f"::error::{android_version} / {kernel_version} 没有可用的版本数据")
+                          print(f"::error::{android_version} / {kernel_version} No version data is available")
                           sys.exit(1)
                       latest = entries[-1]
                       kernel_full = latest.get("kernel", "")
                       patch_level = latest.get("date", "")
                       sub_level = kernel_full.rsplit(".", 1)[-1]
-                      print(f"::warning::{android_version} / {kernel_version}.{token} 无对应数据，回退到 {kernel_full} ({patch_level})")
+                      print(f"::warning::{android_version} / {kernel_version}.{token} has no matching data; falling back to {kernel_full} ({patch_level})")
                   else:
-                      # entries 按日期升序，取该子版本对应的最新安全补丁级别
+                      # Entries are sorted by date; use the latest security patch level for this sub-level.
                       latest = matches[-1]
                       kernel_full = latest.get("kernel", "")
                       patch_level = latest.get("date", "")
                       sub_level = token
               else:
-                  print(f"::error::无法识别的子版本: {sub_level_input}")
+                  print(f"::error::Unrecognized sub-level: {sub_level_input}")
                   sys.exit(1)
           else:
-              # auto：取版本数据中最新的月度 ASB 条目（数据由 update_data.py 持续刷新）
+              # For auto, use the latest monthly ASB entry; update_data.py refreshes this data.
               entries = data.get("entries", [])
               if not entries:
-                  print(f"::error::{android_version} / {kernel_version} 没有可用的版本数据")
+                  print(f"::error::{android_version} / {kernel_version} No version data is available")
                   sys.exit(1)
               latest = entries[-1]
               kernel_full = latest.get("kernel", "")
               prefix = f"{kernel_version}."
               if not kernel_full.startswith(prefix):
-                  print(f"::error::版本数据异常: {kernel_full} 不属于 {kernel_version}")
+                  print(f"::error::Invalid version data: {kernel_full} does not belong to kernel {kernel_version}")
                   sys.exit(1)
               patch_level = latest.get("date", "")
               sub_level = kernel_full.rsplit(".", 1)[-1]
@@ -545,13 +546,13 @@ jobs:
               output.write(f"kernel_full={kernel_full}\n")
               output.write(f"os_patch_level={patch_level}\n")
 
-          print(f"解析结果: {android_version} / {kernel_full} / 补丁级别 {patch_level}，子版本号: {sub_level}")
+          print(f"Resolved settings: {android_version} / {kernel_full} / patch level {patch_level}, sub-level: {sub_level}")
           PY
 
   build-custom-kernel:
     name: "${{ needs.resolve-version.outputs.kernel_full }}-${{ needs.resolve-version.outputs.android_version }}-${{ needs.resolve-version.outputs.os_patch_level }}"
     needs: [resolve-version, get-ksu-manager]
-    # 管理器拉取失败时不阻塞内核构建（ksuCommit 为空则内核跟随 main HEAD）
+    # A failed manager fetch does not block the kernel build (if ksuCommit is empty, the kernel follows main HEAD)
     if: ${{ !cancelled() && needs.resolve-version.result == 'success' }}
     uses: ./.github/workflows/build.yml
     secrets: inherit
@@ -563,8 +564,8 @@ jobs:
       revision: "r1"
       ksu_variant: ${{ inputs.kernelsu_variant }}
       build_channel: ${{ inputs.build_channel }}
-      # 内核侧 KernelSU 检出到官方最新上传 Manager 构建的同一提交，
-      # 使内核 KSU 版本与拉取的管理器安装包严格一致（BakaSU / FinaSU 生效）
+      # Check out the same commit used by the latest official Manager build for the kernel-side KernelSU,
+      # so the kernel-side KSU version exactly matches the downloaded manager APK (applies to BakaSU / FinaSU)
       ksu_commit: ${{ needs.get-ksu-manager.outputs.ksuCommit }}
       ksu_cert_size: ${{ needs.get-ksu-manager.outputs.managerCertSize }}
       ksu_cert_hash: ${{ needs.get-ksu-manager.outputs.managerCertHash }}
@@ -579,14 +580,14 @@ jobs:
       use_nomount: ${{ inputs.use_nomount || false }}
       cve_2026_43499_patch: ${{ inputs.cve_2026_43499_patch }}
       supp_op: ${{ inputs.supp_op || false }}
-      enable_susfs: ${{ inputs.ksu_mode != '禁用SUSFS' && inputs.ksu_mode != '禁用KSU' }}
+      enable_susfs: ${{ inputs.ksu_mode != 'Disable SUSFS' && inputs.ksu_mode != 'Disable KernelSU' }}
       ksu_mode: ${{ inputs.ksu_mode }}
       droidspaces: ${{ startsWith(inputs.droidspaces, '678') && '678' || startsWith(inputs.droidspaces, '123') && '123' || startsWith(inputs.droidspaces, '345') && '345' || 'off' }}
       droidspaces_ntsync: ${{ contains(inputs.droidspaces, 'NTSync') }}
       artifact_upload_mode: ${{ inputs.artifact_upload_mode }}
       skip_incompatible: ${{ inputs.skip_incompatible || false }}
 
-  # 先拉取官方最新上传的 Manager 构建并输出其提交 SHA，供内核构建对齐
+  # Fetch the latest official Manager build and output its commit SHA so the kernel build can use the matching revision
   get-ksu-manager:
     uses: ./.github/workflows/get-manager.yml
     secrets: inherit

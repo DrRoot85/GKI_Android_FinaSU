@@ -34,7 +34,7 @@ on:
 
       # ==================== KernelSU 配置 ====================
       kernelsu_variant:
-        description: "KernelSU 变体"
+        description: "KernelSU variant"
         type: choice
         options:
           - SukiSU
@@ -44,31 +44,31 @@ on:
         default: FinaSU
 
       build_channel:
-        description: "构建通道（正式=官方 Release 发行版，最新=上游最新提交）"
+        description: "Build channel (Stable = official Release; Latest = upstream HEAD)"
         type: choice
         options:
-          - "正式 (Release)"
-          - "最新 (HEAD)"
-        default: "正式 (Release)"
+          - "Stable (Release)"
+          - "Latest (HEAD)"
+        default: "Stable (Release)"
 
       # ==================== 可选配置 ====================
       version:
-        description: "自定义版本名 (可选)"
+        description: "Custom version name (optional)"
         type: string
         default: ""
         required: false
       build_time:
-        description: "自定义构建时间 (留空=自动获取当前北京时间) (示例 Tue Dec  1 08:10:00 UTC 2026)"
+        description: "Custom build time (leave blank to use the current Beijing time; example: Tue Dec  1 08:10:00 UTC 2026)"
         type: string
         default: ""
         required: false
       # ==================== 选项配置 ====================
       use_kpm:
-        description: "KPM 功能（仅SukiSU支持，开启未修补）"
+        description: "KPM feature (SukiSU only; enabling it leaves it unpatched)"
         type: boolean
         default: false
       droidspaces:
-        description: "Droidspaces 容器支持 (5.10~6.6: 槽位补丁, 6.12: 开/关；带 NTSync 的选项会同时注入 NTSync)"
+        description: "Droidspaces container support (5.10~6.6: 槽位补丁, 6.12: 开/关；带 NTSync 的选项会同时注入 NTSync)"
         type: choice
         options:
           - "off"
@@ -80,51 +80,51 @@ on:
           - "345 (NTSync)"
         default: "off"
       artifact_upload_mode:
-        description: "构建产物上传模式"
+        description: "Build artifact upload mode"
         required: true
         type: choice
         options:
-          - "仅上传 AnyKernel3.zip"
-          - "上传全部"
-        default: "仅上传 AnyKernel3.zip"
+          - "AnyKernel3.zip only"
+          - "Upload all"
+        default: "AnyKernel3.zip only"
       ksu_mode:
-        description: "KernelSU / SUSFS 模式"
+        description: "KernelSU / SUSFS mode"
         type: choice
         options:
-          - "关闭"
-          - "禁用SUSFS"
-          - "禁用KSU"
-        default: "关闭"
+          - "Disabled"
+          - "Disable SUSFS"
+          - "Disable KernelSU"
+        default: "Disabled"
 
       # ==================== 功能开关 ====================
       use_zram:
-        description: "启用 ZRAM 压缩算法（仅 5.10~6.6，6.12/6.18 不支持）"
+        description: "Enable the ZRAM compression algorithm（仅 5.10~6.6，6.12/6.18 不支持）"
         type: boolean
         default: false
       use_bbg:
-        description: "启用 BBG 基带保护"
+        description: "Enable BBG baseband protection"
         type: boolean
         default: false
       use_net_enhance:
-        description: "启用 网络增强 (BBRv3 + IPSet + Qdisc + CIFS)"
+        description: "Enable network enhancements (BBRv3 + IPSet + Qdisc + CIFS)"
         type: boolean
         default: false
       use_rekernel:
-        description: "启用 Re-Kernel 驱动"
+        description: "Enable the Re-Kernel driver"
         type: boolean
         default: false
       use_nomount:
-        description: "启用 NoMount 挂载元模块（需自行刷入配套模块）"
+        description: "Enable the NoMount mount metamodule (the matching module must be flashed separately)"
         type: boolean
         default: false
       cve_2026_43499_patch:
-        description: "应用 CVE-2026-43499 rtmutex 修复链"
+        description: "Apply the CVE-2026-43499 rtmutex fix chain"
         type: boolean
         default: false
 
       # ==================== 兼容性 ====================
       skip_incompatible:
-        description: "功能不兼容或无法使用时自动跳过该功能（不中断构建）"
+        description: "Automatically skip incompatible or unavailable features without stopping the build"
         type: boolean
         default: true
 
@@ -608,7 +608,7 @@ jobs:
           echo "REKERNEL_STATUS=${{ inputs.use_rekernel && '开启' || '未开启' }}" >> $GITHUB_ENV
           echo "KPM_STATUS=${{ inputs.use_kpm && '开启（未修补）' || '未开启' }}" >> $GITHUB_ENV
 
-          # Droidspaces 容器支持（含 NTSync）
+          # Droidspaces container support（含 NTSync）
           if [ "${{ inputs.droidspaces }}" = "off" ]; then
             echo "DROIDSPACES_STATUS=未开启" >> $GITHUB_ENV
           elif [[ "${{ inputs.droidspaces }}" == *NTSync* ]]; then
@@ -637,9 +637,9 @@ jobs:
           echo "RELEASE_NAME=GKI Kernel: ${KSU_NAME} ${KSU_VER} + SUSFS ${SUS_VER}" >> $GITHUB_ENV
           echo "RELEASE_HEADER=**${KSU_NAME} ${KSU_VER}** + **SUSFS ${SUS_VER}**" >> $GITHUB_ENV
 
-          # KernelSU / SUSFS 模式覆盖（GITHUB_ENV 后写入的同名变量生效）
+          # KernelSU / SUSFS mode覆盖（GITHUB_ENV 后写入的同名变量生效）
           case "${{ inputs.ksu_mode }}" in
-            "禁用KSU")
+            "Disable KernelSU")
               echo "KSU_NAME=未集成" >> $GITHUB_ENV
               echo "KSU_VER=-" >> $GITHUB_ENV
               echo "SUS_VER=未集成" >> $GITHUB_ENV
@@ -649,7 +649,7 @@ jobs:
               echo "RELEASE_NAME=GKI Kernel: 纯净版（无 KernelSU / SUSFS）" >> $GITHUB_ENV
               echo "RELEASE_HEADER=**纯净 GKI 内核**（未集成 KernelSU / SUSFS）" >> $GITHUB_ENV
               ;;
-            "禁用SUSFS")
+            "Disable SUSFS")
               echo "SUS_VER=未集成" >> $GITHUB_ENV
               echo "RELEASE_NAME=GKI Kernel: ${KSU_NAME} ${KSU_VER}（无 SUSFS）" >> $GITHUB_ENV
               echo "RELEASE_HEADER=**${KSU_NAME} ${KSU_VER}**（未集成 SUSFS）" >> $GITHUB_ENV
@@ -687,11 +687,11 @@ jobs:
       # ==================== 确定 KSU 引用 ====================
       # 根据实际构建逻辑确定 KernelSU 上游引用
       - name: 确定 KSU 引用
-        if: inputs.ksu_mode != '禁用KSU'
+        if: inputs.ksu_mode != 'Disable KernelSU'
         run: |
           case "${{ inputs.kernelsu_variant }}" in
             "SukiSU")
-              if [ "${{ inputs.ksu_mode }}" = "关闭" ]; then
+              if [ "${{ inputs.ksu_mode }}" = "Disabled" ]; then
                 BRANCH="builtin"
               else
                 BRANCH="main"
@@ -819,7 +819,7 @@ jobs:
           append_susfs_commit "${{ inputs.build_a14_6_1 || inputs.build_all }}" "Android 14 / 6.1" "${COMMIT_HASH_gki_android14_6_1}" "${COMMIT_URL_gki_android14_6_1}"
           append_susfs_commit "${{ inputs.build_a15_6_6 || inputs.build_all }}" "Android 15 / 6.6" "${COMMIT_HASH_gki_android15_6_6}" "${COMMIT_URL_gki_android15_6_6}"
           append_susfs_commit "${{ inputs.build_a16_6_12 || inputs.build_all }}" "Android 16 / 6.12" "${COMMIT_HASH_gki_android16_6_12}" "${COMMIT_URL_gki_android16_6_12}"
-          if [ "${{ inputs.ksu_mode }}" != "关闭" ]; then
+          if [ "${{ inputs.ksu_mode }}" != "Disabled" ]; then
             echo "- 本次构建未集成 SUSFS" > susfs_commits.md
           elif [[ ! -s susfs_commits.md ]]; then
             echo "- 未获取到本次构建对应的 SUSFS 提交信息" > susfs_commits.md
@@ -841,7 +841,7 @@ jobs:
 
           | 项目 | 内容 |
           |:---|:---|
-          | KernelSU 变体 | $KSU_NAME |
+          | KernelSU variant | $KSU_NAME |
           | KernelSU 版本 | $KSU_VER |
           | KernelSU 分支 | $BRANCH_INFO |
           | SUSFS | $SUS_VER |
@@ -853,7 +853,7 @@ jobs:
           | 网络增强 (BBRv3 / IPSet / Qdisc / CIFS) | $NET_ENHANCE_STATUS |
           | Re-Kernel 驱动 | $REKERNEL_STATUS |
           | KPM | $KPM_STATUS |
-          | Droidspaces 容器支持 | $DROIDSPACES_STATUS |
+          | Droidspaces container support | $DROIDSPACES_STATUS |
 
           ### 下载说明
 
@@ -1000,7 +1000,7 @@ jobs:
         run: |
           # 仅上传模式的 artifact 为散装刷入内容：打成完整 AnyKernel3 包后只上传 zip，
           # 避免多版本同名散文件（Image/anykernel.sh...）在 Release 上冲突报错；
-          # 上传全部模式（目录内已有 zip + img）保持逐文件上传，互不影响。
+          # Upload all模式（目录内已有 zip + img）保持逐文件上传，互不影响。
           # --clobber 保证 job 重跑时同名资产覆盖而非报错。
           for dir in ./downloaded-artifacts/*/; do
             [ -d "$dir" ] || continue
@@ -1008,7 +1008,7 @@ jobs:
             case "$dir/" in
               *-Build-Logs/|*-Rejects/|*Manager*/|*susfs-*/|*nomount-*/) continue ;;
             esac
-            # 只处理内核刷入包：仅上传模式含 anykernel.sh，上传全部模式含 *-AnyKernel3.zip
+            # 只处理内核刷入包：仅上传模式含 anykernel.sh，Upload all模式含 *-AnyKernel3.zip
             if [ ! -f "$dir/anykernel.sh" ] && ! ls "$dir"/*-AnyKernel3.zip >/dev/null 2>&1; then
               continue
             fi
@@ -1025,10 +1025,61 @@ jobs:
             fi
           done
 
-      # ==================== 构建摘要 ====================
-      - name: 构建摘要
+      # ==================== Build summary ====================
+      - name: Build summary
         run: |
-          echo "## 发布已创建" >> $GITHUB_STEP_SUMMARY
-          echo "- **标签**: $NEW_TAG" >> $GITHUB_STEP_SUMMARY
-          echo "- **类型**: ${{ inputs.release_type }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **链接**: https://github.com/$REPO_OWNER/$REPO_NAME/releases/tag/$NEW_TAG" >> $GITHUB_STEP_SUMMARY
+          echo "## Release created" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag**: $NEW_TAG" >> $GITHUB_STEP_SUMMARY
+          echo "- **Type**: ${{ inputs.release_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Link**: https://github.com/$REPO_OWNER/$REPO_NAME/releases/tag/$NEW_TAG" >> $GITHUB_STEP_SUMMARY
+
+      - name: Send release announcement to Telegram
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: "-1004456803688"
+        run: |
+          export RELEASE_TITLE="$RELEASE_NAME"
+          export RELEASE_TAG="$NEW_TAG"
+          export RELEASE_URL="https://github.com/$GITHUB_REPOSITORY/releases/tag/$NEW_TAG"
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+          import urllib.error
+          import urllib.request
+
+          token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+          if not token:
+              print("::warning::Telegram notification skipped; set the TELEGRAM_BOT_TOKEN repository secret.")
+              sys.exit(0)
+
+          message = (
+              f"{os.environ['RELEASE_TITLE']}\n"
+              f"Tag: {os.environ['RELEASE_TAG']}\n"
+              f"{os.environ['RELEASE_URL']}"
+          )
+          payload = json.dumps({
+              "chat_id": os.environ["TELEGRAM_CHAT_ID"],
+              "text": message,
+              "disable_web_page_preview": False,
+          }).encode("utf-8")
+          request = urllib.request.Request(
+              f"https://api.telegram.org/bot{token}/sendMessage",
+              data=payload,
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          try:
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  result = json.loads(response.read().decode("utf-8"))
+              if not result.get("ok"):
+                  raise RuntimeError("Telegram rejected the message")
+              print("Release announcement sent to Telegram.")
+          except urllib.error.HTTPError as error:
+              print(f"::error::Telegram API returned HTTP {error.code}; check the token and channel permissions.")
+              sys.exit(1)
+          except Exception:
+              print("::error::Could not send the Telegram release announcement.")
+              sys.exit(1)
+          PY
