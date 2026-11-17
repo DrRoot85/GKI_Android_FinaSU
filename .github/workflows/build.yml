@@ -1,4 +1,4 @@
-name: Kernel build workflow
+name: 内核构建流程
 
 permissions:
   contents: write
@@ -7,7 +7,7 @@ permissions:
 on:
   workflow_call:
     inputs:
-      # ==================== Basic configuration ====================
+      # ==================== 基础配置 ====================
       android_version:
         required: true
         type: string
@@ -18,7 +18,7 @@ on:
         required: true
         type: string
       display_sub:
-        description: "Display-only sub-version number for LTS builds (maintained by the data pipeline; used only for run/job naming)"
+        description: "LTS 构建的展示用子版本号（数据管线维护，仅用于运行/作业命名）"
         required: false
         type: string
         default: ""
@@ -26,32 +26,37 @@ on:
         required: true
         type: string
 
-      # ==================== KernelSU configuration ====================
+      # ==================== KernelSU 配置 ====================
       ksu_variant:
         required: true
         type: string
       build_channel:
-        description: "Build channel: Release aligns with the official release; Latest (HEAD) follows the latest upstream commit (used only for labeling and summaries)"
+        description: "构建通道：正式 (Release) 对齐官方发行版；最新 (HEAD) 跟随上游最新提交（仅用于标识与摘要）"
         required: false
         type: string
-        default: "Release"
+        default: "正式 (Release)"
       ksu_commit:
-        description: "BakaSU only: check out KernelSU at this commit to align with the latest official uploaded build (leave empty to follow main HEAD)"
+        description: "BakaSU 专用：KernelSU 检出到该提交以对齐官方最新上传构建（留空跟随 main HEAD）"
         required: false
         type: string
         default: ""
       ksu_cert_size:
-        description: "FinaSU only: manager signing certificate DER size (0x hex, used to align the second trust slot)"
+        description: "FinaSU 专用：管理器签名证书 DER 尺寸（0x 十六进制，第二信任槽对齐用）"
         required: false
         type: string
         default: ""
       ksu_cert_hash:
-        description: "FinaSU only: manager signing certificate SHA256 (used to align the second trust slot)"
+        description: "FinaSU 专用：管理器签名证书 SHA256（第二信任槽对齐用）"
+        required: false
+        type: string
+        default: ""
+      manager_ver:
+        description: "管理器 versionCode（如 32730），作为内核命名版本；优先级高于按提交数推导的 KSU_VERSION"
         required: false
         type: string
         default: ""
 
-      # ==================== Optional configuration ====================
+      # ==================== 可选配置 ====================
       version:
         required: false
         type: string
@@ -64,7 +69,7 @@ on:
         type: string
         default: ""
 
-      # ==================== Feature switches ====================
+      # ==================== 功能开关 ====================
       use_zram:
         required: true
         type: boolean
@@ -100,7 +105,7 @@ on:
       ksu_mode:
         required: false
         type: string
-        default: "Off"
+        default: "关闭"
       supp_op:
         required: false
         type: boolean
@@ -112,13 +117,13 @@ on:
       artifact_upload_mode:
         required: false
         type: string
-        default: "Upload all"
+        default: "上传全部"
       droidspaces_ntsync:
         required: false
         type: boolean
         default: false
       skip_incompatible:
-        description: "Automatically skip incompatible or unavailable features instead of stopping the build"
+        description: "功能不兼容或无法使用时自动跳过该功能（不中断构建）"
         required: false
         type: boolean
         default: true
@@ -127,7 +132,7 @@ jobs:
   build-kernel:
     name: "${{ inputs.kernel_version }}.${{ inputs.display_sub || inputs.sub_level }}-${{ inputs.android_version }}-${{ inputs.os_patch_level }}-${{ inputs.ksu_variant }}"
     runs-on: ubuntu-24.04
-    # repo sync retries (3 x 20 minutes) + a full build need more than 60 minutes of headroom
+    # repo sync 重试（3 x 20 分钟）+ 完整构建需要 60 分钟以上的余量
     timeout-minutes: 90
 
     env:
@@ -137,33 +142,33 @@ jobs:
       SKIP_INCOMPATIBLE: ${{ inputs.skip_incompatible }}
 
     steps:
-      - name: Build info summary
+      - name: 构建信息摘要
         run: |
           echo "========================================"
-          echo "       Kernel build configuration summary"
+          echo "       内核构建配置摘要"
           echo "========================================"
-          echo "Android version : ${{ inputs.android_version }}"
-          echo "Kernel version  : ${{ inputs.kernel_version }}"
-          echo "Sub-level       : ${{ inputs.sub_level }}"
-          echo "Patch level     : ${{ inputs.os_patch_level }}"
-          echo "KSU variant     : ${{ inputs.ksu_variant }}"
-          echo "Build channel   : ${{ inputs.build_channel }}"
-          echo "Build time      : ${{ inputs.build_time }}"
-          echo "SUSFS status    : ${{ inputs.enable_susfs }}"
-          echo "ZRAM compression: ${{ inputs.use_zram }}"
-          echo "BBG patch       : ${{ inputs.use_bbg }}"
-          echo "Network enhance : ${{ inputs.use_net_enhance }}"
-          echo "KPM             : ${{ inputs.use_kpm && 'On' || 'Off' }}"
-          echo "NoMount module  : ${{ inputs.use_nomount && 'On' || 'Off' }}"
+          echo "Android 版本  : ${{ inputs.android_version }}"
+          echo "内核版本      : ${{ inputs.kernel_version }}"
+          echo "子版本号      : ${{ inputs.sub_level }}"
+          echo "补丁级别      : ${{ inputs.os_patch_level }}"
+          echo "KSU 变体      : ${{ inputs.ksu_variant }}"
+          echo "构建通道      : ${{ inputs.build_channel }}"
+          echo "构建时间      : ${{ inputs.build_time }}"
+          echo "SUSFS 状态    : ${{ inputs.enable_susfs }}"
+          echo "ZRAM 压缩     : ${{ inputs.use_zram }}"
+          echo "BBG 补丁      : ${{ inputs.use_bbg }}"
+          echo "网络增强      : ${{ inputs.use_net_enhance }}"
+          echo "KPM 功能      : ${{ inputs.use_kpm && '开启' || '关闭' }}"
+          echo "NoMount 元模块: ${{ inputs.use_nomount && '开启' || '关闭' }}"
           echo "Re-Kernel     : ${{ inputs.use_rekernel }}"
           echo "CVE-2026-43499: ${{ inputs.cve_2026_43499_patch }}"
           echo "Droidspaces   : ${{ inputs.droidspaces }}"
           echo "NTSync        : ${{ inputs.droidspaces_ntsync }}"
-          echo "Skip incompatible: ${{ inputs.skip_incompatible }}"
-          echo "Artifact upload : ${{ inputs.artifact_upload_mode }}"
+          echo "兼容跳过      : ${{ inputs.skip_incompatible }}"
+          echo "产物上传模式  : ${{ inputs.artifact_upload_mode }}"
           echo "========================================"
 
-      - name: Free up disk space
+      - name: 清理磁盘空间
         uses: endersonmenezes/free-disk-space@v3
         with:
           remove_android: true
@@ -178,10 +183,10 @@ jobs:
           rmz_version: "3.1.1"
           testing: false
 
-      - name: Check out repository
+      - name: 检出代码仓库
         uses: actions/checkout@v7
 
-      - name: Initialize build environment
+      - name: 初始化构建环境
         run: |
           CONFIG="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}"
           KERNEL_ROOT="$GITHUB_WORKSPACE/$CONFIG"
@@ -209,20 +214,20 @@ jobs:
           echo "$GITHUB_WORKSPACE/git-repo" >> "$GITHUB_PATH"
           echo "REPO=$GITHUB_WORKSPACE/git-repo/repo" >> $GITHUB_ENV
 
-      - name: Show configuration
+      - name: 显示配置信息
         run: |
           CONFIG_FILE="$GITHUB_WORKSPACE/config/config"
           if [ -f "$CONFIG_FILE" ]; then
-            echo "Loading config file: $CONFIG_FILE"
+            echo "加载配置文件: $CONFIG_FILE"
             cat "$CONFIG_FILE"
           fi
 
-      - name: Install build dependencies
+      - name: 安装编译依赖
         run: |
           sudo apt-get update
           sudo apt-get install -y ccache python3 git curl build-essential libssl-dev bison flex libelf-dev dwarves lz4
 
-      - name: Configure ccache
+      - name: 配置 ccache
         run: |
           mkdir -p ~/.cache/bazel
           ccache --version
@@ -230,7 +235,7 @@ jobs:
           ccache --set-config=compression=true
           echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
 
-      - name: Restore ccache cache
+      - name: 恢复 ccache 缓存
         uses: actions/cache@v5
         with:
           path: ~/.ccache
@@ -238,8 +243,8 @@ jobs:
           restore-keys: |
             ${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-ccache-
 
-      # Only 6.1+ uses the bazel build; persist the --disk_cache directory to speed up later builds
-      - name: Restore bazel disk cache
+      # 仅 6.1+ 走 bazel 构建，持久化 --disk_cache 目录以加速后续构建
+      - name: 恢复 bazel 磁盘缓存
         if: inputs.android_version != 'android12' && inputs.android_version != 'android13'
         uses: actions/cache@v5
         with:
@@ -249,7 +254,7 @@ jobs:
             ${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-bazel-
             ${{ inputs.android_version }}-${{ inputs.kernel_version }}-bazel-
           
-      - name: Cache toolchain
+      - name: 缓存工具链
         id: cache-toolchain
         uses: actions/cache@v5
         with:
@@ -258,7 +263,7 @@ jobs:
             mkbootimg
           key: toolchain-${{ runner.os }}-v1
 
-      - name: Download toolchain
+      - name: 下载工具链
         if: steps.cache-toolchain.outputs.cache-hit != 'true'
         run: |
           AOSP_MIRROR=https://android.googlesource.com
@@ -266,50 +271,50 @@ jobs:
           git clone $AOSP_MIRROR/kernel/prebuilts/build-tools -b $BRANCH --depth 1 kernel-build-tools
           git clone $AOSP_MIRROR/platform/system/tools/mkbootimg -b $BRANCH --depth 1 mkbootimg
 
-      - name: Generate signing keys
+      - name: 生成签名密钥
         run: |
           openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 > $BOOT_SIGN_KEY_PATH
 
-      - name: Configure Git
+      - name: 配置 Git
         run: |
           git config --global user.name "BuildBot"
           git config --global user.email "BuildGkiKernel@gmail.com"
-          # Upstream git servers occasionally stall: abort if the transfer rate stays below 1KB/s for 180 seconds,
-          # to avoid hanging indefinitely in repo sync / git clone until the job times out
+          # 上游 git 服务偶发连接停滞：传输速率低于 1KB/s 持续 180 秒即中止，
+          # 避免在 repo sync / git clone 中无限挂起直到 job 超时
           git config --global http.lowSpeedLimit 1000
           git config --global http.lowSpeedTime 180
 
-      - name: Clone dependency repositories
+      - name: 克隆依赖仓库
         run: |
           ANYKERNEL_BRANCH="gki-2.0"
           SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
 
-          echo "Cloning AnyKernel3..."
+          echo "克隆 AnyKernel3..."
           git clone https://github.com/WildKernels/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
           rm -rf AnyKernel3/.git
 
-          echo "Cloning SUSFS (branch: $SUSFS_BRANCH)..."
-          # Automatically skip SUSFS when upstream has no matching SUSFS branch, to avoid breaking the build
+          echo "克隆 SUSFS (分支: $SUSFS_BRANCH)..."
+          # 上游没有对应 SUSFS 分支时自动跳过 SUSFS，避免中断构建
           susfs_branch_missing() {
             if [ "$SKIP_INCOMPATIBLE" != "true" ]; then
-              echo "::error::Upstream has no SUSFS branch $1"
+              echo "::error::上游没有 SUSFS 分支 $1"
               exit 1
             fi
-            echo "::warning title=SUSFS skipped::Upstream has no SUSFS branch $1; SUSFS feature skipped"
+            echo "::warning title=SUSFS 已跳过::上游没有 SUSFS 分支 $1，已跳过 SUSFS 功能"
             if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
               echo "" >> "$GITHUB_STEP_SUMMARY"
-              echo "> ⏭️ **SUSFS** skipped automatically: upstream has no $1 branch (build not interrupted)" >> "$GITHUB_STEP_SUMMARY"
+              echo "> ⏭️ **SUSFS** 已自动跳过：上游没有 $1 分支（构建未中断）" >> "$GITHUB_STEP_SUMMARY"
             fi
             echo "SUSFS_SKIPPED=true" >> "$GITHUB_ENV"
             rm -rf susfs4ksu
             mkdir -p susfs4ksu
           }
           if [ "${{ inputs.enable_susfs }}" != "true" ]; then
-            echo "SUSFS is disabled; skipping SUSFS repository clone"
+            echo "SUSFS 已禁用，跳过 SUSFS 仓库克隆"
             mkdir -p susfs4ksu
-          elif [ "${{ inputs.ksu_variant }}" == "SukiSU-Nova" ]; then
+          elif [ "${{ inputs.ksu_variant }}" == "SukiSU" ]; then
             if ! git clone https://github.com/ShirkNeko/susfs4ksu.git -b "$SUSFS_BRANCH" 2>/dev/null; then
-              echo "ShirkNeko repository has no branch $SUSFS_BRANCH; falling back to the original simonpunk repo..."
+              echo "ShirkNeko 仓库未找到分支 $SUSFS_BRANCH，回退到 simonpunk 原版..."
               git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH" \
                 || susfs_branch_missing "$SUSFS_BRANCH"
             fi
@@ -324,7 +329,7 @@ jobs:
             if [ "$CUSTOM_ENABLED" == "true" ]; then
               CUSTOM_COMMIT=$(grep "^${SUSFS_BRANCH}=" "$CONFIG_FILE" | cut -d'=' -f2)
               if [ -n "$CUSTOM_COMMIT" ]; then
-                echo "Switching SUSFS to custom commit: $CUSTOM_COMMIT"
+                echo "切换 SUSFS 到自定义提交: $CUSTOM_COMMIT"
                 cd susfs4ksu
                 git checkout "$CUSTOM_COMMIT"
                 cd ..
@@ -335,24 +340,24 @@ jobs:
           if [ -d susfs4ksu/.git ]; then
             SUSFS_LATEST_COMMIT_DATE=$(git -C susfs4ksu log -1 --date=format:'%Y-%m-%d %H:%M:%S %z' --format='%cd')
           else
-            SUSFS_LATEST_COMMIT_DATE="Not enabled"
+            SUSFS_LATEST_COMMIT_DATE="未启用"
           fi
           echo "SUSFS_LATEST_COMMIT_DATE=$SUSFS_LATEST_COMMIT_DATE" >> $GITHUB_ENV
-          echo "SUSFS repository latest commit date: $SUSFS_LATEST_COMMIT_DATE"
+          echo "SUSFS 仓库最新提交日期: $SUSFS_LATEST_COMMIT_DATE"
 
-          echo "Preparing patch resources..."
+          echo "准备补丁资源..."
           git clone https://github.com/WildKernels/kernel_patches.git
           git clone https://github.com/ShirkNeko/SukiSU_patch.git
-          echo "Using the current repository's patch directory: $ZZH_PATCHES"
+          echo "使用当前仓库补丁目录: $ZZH_PATCHES"
           git clone https://github.com/Numbersf/Action-Build.git --depth=1
 
-      - name: Initialize and sync kernel source
+      - name: 初始化并同步内核源码
         working-directory: ${{ env.KERNEL_ROOT }}
         run: |
           git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-6.4.1.git gcc
 
           FORMATTED_BRANCH="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}"
-          echo "Initializing repo, branch: common-${FORMATTED_BRANCH}"
+          echo "初始化 repo，分支: common-${FORMATTED_BRANCH}"
 
           $REPO init --depth=1 -u https://android.googlesource.com/kernel/manifest -b common-${FORMATTED_BRANCH} --repo-rev=v2.16
 
@@ -360,64 +365,64 @@ jobs:
           DEFAULT_MANIFEST_PATH=.repo/manifests/default.xml
 
           if grep -q deprecated <<< $REMOTE_BRANCH; then
-            echo "Detected deprecated branch: $FORMATTED_BRANCH"
+            echo "检测到已弃用的分支: $FORMATTED_BRANCH"
             sed -i "s/\"${FORMATTED_BRANCH}\"/\"deprecated\/${FORMATTED_BRANCH}\"/g" $DEFAULT_MANIFEST_PATH
           elif [[ -z "$REMOTE_BRANCH" ]]; then
-            echo "Branch was deleted upstream: ${FORMATTED_BRANCH}; falling back to the latest ASB tag of that month"
+            echo "分支已被上游删除: ${FORMATTED_BRANCH}，回退到该月最新 ASB tag"
             LATEST_R=$(git ls-remote https://android.googlesource.com/kernel/common "refs/tags/${FORMATTED_BRANCH}_r*" \
               | grep -v '\^{}' \
               | sed 's/.*_r//' \
               | sort -n | tail -1)
             if [[ -z "$LATEST_R" ]]; then
-              echo "::error::Neither the upstream branch nor the monthly tag exists: ${FORMATTED_BRANCH}"
+              echo "::error::上游分支与月度 tag 均不存在: ${FORMATTED_BRANCH}"
               exit 1
             fi
             LATEST_TAG="${FORMATTED_BRANCH}_r${LATEST_R}"
-            echo "Using tag: ${LATEST_TAG}"
+            echo "使用 tag: ${LATEST_TAG}"
             REMOTE_BRANCH="refs/tags/${LATEST_TAG}"
             sed -i "s/\"${FORMATTED_BRANCH}\"/\"refs\/tags\/${LATEST_TAG}\"/g" $DEFAULT_MANIFEST_PATH
           fi
 
-          # repo sync supports resuming: each attempt is limited to 20 minutes; on timeout or failure, leftover processes are cleaned up and it retries,
-          # and projects that already synced are skipped on the next attempt; this prevents a stalled upstream connection from consuming the whole job time limit
+          # repo sync 支持断点续传：单次限时 20 分钟，超时或失败后清理残留进程重试，
+          # 已同步完成的项目在下次尝试中自动跳过；防止上游连接停滞挂满整个 job 时限
           SYNC_OK=false
           for SYNC_ATTEMPT in 1 2 3; do
-            echo "==> repo sync attempt ${SYNC_ATTEMPT}/3"
+            echo "==> repo sync 第 ${SYNC_ATTEMPT}/3 次尝试"
             if timeout --kill-after=30 20m $REPO --trace sync -c -j$(nproc --all) --no-tags --fail-fast; then
               SYNC_OK=true
               break
             fi
-            # Recoverable retries only write to the log; three consecutive failures are still reported by the error annotation below
-            echo "repo sync retry: attempt ${SYNC_ATTEMPT}/3 failed or timed out; cleaning up leftover git processes and retrying"
+            # 可恢复的重试只写日志；连续三次失败仍由下方 error 注解报告
+            echo "repo sync 重试：第 ${SYNC_ATTEMPT}/3 次同步失败或超时，清理残留 git 进程后重试"
             pkill -9 -f 'git-remote-https' 2>/dev/null || true
             pkill -9 -f 'android\.googlesource\.com' 2>/dev/null || true
             sleep 10
           done
           if [ "$SYNC_OK" != "true" ]; then
-            echo "::error::repo sync failed 3 consecutive attempts (upstream connection stalled or unavailable)"
+            echo "::error::repo sync 连续 3 次尝试均失败（上游连接停滞或不可用）"
             exit 1
           fi
 
-          # Integrity guard: a resumed repo sync occasionally leaves an incompletely checked-out project, showing up as a directory
-          # with only scattered files and missing BUILD files; the bazel loading phase then reports
-          # "Every .bzl file must have a corresponding package".
-          # Only check kleaf/BUILD.bazel (the Bazel package marker): a kleaf directory that exists without a BUILD file
-          # always means an incomplete checkout. Do not check specific .bzl files — older branches (such as the
-          # main-kernel-build-2023 used by 6.1) have kleaf directories that never contained the scripts added later, which would cause false alarms.
+          # 完整性守卫：repo sync 断点续传偶发留下检出不完整的项目，表现为目录里
+          # 只剩零散文件、缺 BUILD 文件，bazel 加载阶段会报
+          # "Every .bzl file must have a corresponding package"。
+          # 只校验 kleaf/BUILD.bazel（Bazel 包标识）：kleaf 目录存在却无 BUILD 文件
+          # 一定意味着检出不完整。不要校验具体的 .bzl 文件——旧分支（如 6.1 用的
+          # main-kernel-build-2023）kleaf 目录本就不含较晚才加入的脚本，会误报。
           for KLEAF_DIR in \
             prebuilts/clang/host/linux-x86/kleaf \
             build/kernel/kleaf; do
             if [ -d "$KLEAF_DIR" ] && [ ! -f "$KLEAF_DIR/BUILD.bazel" ]; then
               PROJECT_DIR="${KLEAF_DIR%/kleaf}"
-              echo "::warning title=repo sync integrity guard::$KLEAF_DIR is missing BUILD.bazel, checkout incomplete; re-syncing $PROJECT_DIR"
+              echo "::warning title=repo sync 完整性守卫::$KLEAF_DIR 缺少 BUILD.bazel，检出不完整，重新同步 $PROJECT_DIR"
               timeout --kill-after=30 20m $REPO sync -c --force-sync --fail-fast "$PROJECT_DIR" \
-                || echo "::warning title=repo sync integrity guard::Re-sync of $PROJECT_DIR failed; continuing the build"
+                || echo "::warning title=repo sync 完整性守卫::重同步 $PROJECT_DIR 失败，继续构建"
             fi
           done
 
           echo "REMOTE_BRANCH=$REMOTE_BRANCH" >> $GITHUB_ENV
 
-      - name: Extract actual sub-level
+      - name: 提取实际子版本号
         run: |
           ACTUAL_SUBLEVEL="${{ inputs.sub_level }}"
           if [[ -f "$KERNEL_ROOT/common/Makefile" ]]; then
@@ -425,19 +430,19 @@ jobs:
             [[ -n "$EXTRACTED" ]] && ACTUAL_SUBLEVEL="$EXTRACTED"
           fi
           echo "ACTUAL_SUBLEVEL=$ACTUAL_SUBLEVEL" >> $GITHUB_ENV
-          echo "Actual sub-level: $ACTUAL_SUBLEVEL"
+          echo "实际子版本号: $ACTUAL_SUBLEVEL"
           if [[ "${{ inputs.sub_level }}" == "X" ]]; then
             CONFIG="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${ACTUAL_SUBLEVEL}"
             echo "CONFIG=$CONFIG" >> $GITHUB_ENV
             NAME_SUBLEVEL="$ACTUAL_SUBLEVEL"
-            echo "LTS build: artifact naming uses the actual sub-level $ACTUAL_SUBLEVEL"
+            echo "LTS 构建: 产物命名使用实际子版本号 $ACTUAL_SUBLEVEL"
           else
             NAME_SUBLEVEL="${{ inputs.sub_level }}"
           fi
           echo "NAME_SUBLEVEL=$NAME_SUBLEVEL" >> $GITHUB_ENV
 
-      # Decide based on the actual SUBLEVEL after sync, to avoid re-patching LTS kernels that already include the upstream fix
-      - name: Automatically apply the CVE-2026-43499 rtmutex fix chain
+      # 以同步后的实际 SUBLEVEL 判断，避免对已包含上游修复的 LTS 重复打补丁
+      - name: 自动应用 CVE-2026-43499 rtmutex 修复链
         if: inputs.cve_2026_43499_patch
         working-directory: ${{ env.KERNEL_ROOT }}/common
         run: |
@@ -446,32 +451,32 @@ jobs:
             "$ACTUAL_SUBLEVEL" \
             "$GITHUB_WORKSPACE/security_patch"; then
             if [ "$SKIP_INCOMPATIBLE" = "true" ]; then
-              echo "::warning title=CVE-2026-43499 skipped::Fix chain failed to apply (possibly incompatible with the current kernel sub-level); feature skipped and build continues"
+              echo "::warning title=CVE-2026-43499 已跳过::修复链应用失败（可能不兼容当前内核子版本），已跳过该功能继续构建"
               if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
                 echo "" >> "$GITHUB_STEP_SUMMARY"
-                echo "> ⏭️ **CVE-2026-43499 fix chain** skipped automatically: fix chain failed to apply (possibly incompatible with the current kernel sub-level) (build not interrupted)" >> "$GITHUB_STEP_SUMMARY"
+                echo "> ⏭️ **CVE-2026-43499 修复链** 已自动跳过：修复链应用失败（可能不兼容当前内核子版本）（构建未中断）" >> "$GITHUB_STEP_SUMMARY"
               fi
               echo "CVE_SKIPPED=true" >> "$GITHUB_ENV"
               exit 0
             fi
-            echo "::error::CVE-2026-43499 fix chain failed to apply"
+            echo "::error::CVE-2026-43499 修复链应用失败"
             exit 1
           fi
 
-      - name: Fix glibc 2.38 compatibility
+      - name: 修复 glibc 2.38 兼容性
         working-directory: ${{ env.KERNEL_ROOT }}/common
         run: |
-          # On glibc 2.38+, libsubcmd compiled with -D_GNU_SOURCE redirects the strtol family to
-          # __isoc23_strtol; when the old tools/bpf/resolve_btfids/Makefile builds subcmd it
-          # does not pass the kernel-side CFLAGS (the build uses system headers, and linking against the old toolchain reports undefined
-          # symbol). Detect and fix based on whether the Makefile is still in the old format (the subcmd build line has no
-          # EXTRA_CFLAGS), rather than guessing the upstream backport point from the sub-level,
-          # so older branches such as android14-5.15.110 are matched as well.
+          # glibc 2.38+ 上 -D_GNU_SOURCE 编译的 libsubcmd 会把 strtol 族重定向到
+          # __isoc23_strtol；旧版 tools/bpf/resolve_btfids/Makefile 构建 subcmd 时
+          # 不传内核侧 CFLAGS（编译走系统头文件，链接旧工具链时报 undefined
+          # symbol）。按 Makefile 是否仍为旧格式（subcmd 构建行没有
+          # EXTRA_CFLAGS）检测并修复，不再按子版本号猜测上游回移点，
+          # android14-5.15.110 等旧分支同样命中。
           GLIBC_VERSION=$(ldd --version 2>/dev/null | head -n 1 | awk '{print $NF}')
 
           if grep -q '\$(Q)\$(MAKE) -C \$(SUBCMD_SRC) OUTPUT=' tools/bpf/resolve_btfids/Makefile 2>/dev/null \
             && [ "$(printf '%s\n' "2.38" "$GLIBC_VERSION" | sort -V | head -n1)" = "2.38" ]; then
-            echo "Applying glibc 2.38 compatibility fix..."
+            echo "应用 glibc 2.38 兼容性修复..."
             sed -i '/\$(Q)\$(MAKE) -C \$(SUBCMD_SRC) OUTPUT=\$(abspath \$(dir \$@))\/ \$(abspath \$@)/s//$(Q)$(MAKE) -C $(SUBCMD_SRC) EXTRA_CFLAGS="$(CFLAGS)" OUTPUT=$(abspath $(dir $@))\/ $(abspath $@)/' tools/bpf/resolve_btfids/Makefile 2>/dev/null || true
 
             if [[ "${{ inputs.kernel_version }}" == "5.10" || "${{ inputs.kernel_version }}" == "5.15" ]]; then
@@ -482,17 +487,17 @@ jobs:
             fi
           fi
 
-      - name: Add OnePlus Snapdragon 8 Elite/Gen5 processor support
+      - name: 添加 一加 骁龙8 Elite/Gen5 处理器支持
         if: inputs.supp_op
         working-directory: ${{ env.KERNEL_ROOT }}/common/drivers
         run: |
-          echo "Using this repository's hmbird_patch.c..."
+          echo "使用本仓库 hmbird_patch.c..."
           cp "$GITHUB_WORKSPACE/hmbird_patch.c" ./hmbird_patch.c
           echo "obj-y += hmbird_patch.o" >> Makefile
 
-      - name: Determine KernelSU branch
+      - name: 确定 KernelSU 分支
         id: ksu-branch
-        if: inputs.ksu_mode != 'Disable KSU'
+        if: inputs.ksu_mode != '禁用KSU'
         run: |
           variant_input="${{ inputs.ksu_variant }}"
 
@@ -503,37 +508,40 @@ jobs:
             "FinaSU")
               BRANCH="-s master"
               ;;
-            "SukiSU-Nova")
+            "SukiSU")
               if [ "${{ inputs.enable_susfs }}" = "false" ]; then
                 BRANCH="-s main"
               else
                 BRANCH="-s builtin"
               fi
               ;;
+            "KernelSU")
+              BRANCH="-s main"
+              ;;
             *)
-              echo "Unknown variant: $variant_input" >&2
+              echo "未知变体: $variant_input" >&2
               exit 1
               ;;
           esac
 
-          # Check for a custom commit (only applies to SukiSU-Nova)
+          # 检查自定义提交 (仅对 SukiSU 生效)
           CONFIG_FILE="config/config"
           if [ -f "$CONFIG_FILE" ]; then
             CUSTOM_ENABLED=$(grep "^custom=" "$CONFIG_FILE" | cut -d'=' -f2)
-            if [ "$CUSTOM_ENABLED" == "true" ] && [ "$variant_input" == "SukiSU-Nova" ]; then
+            if [ "$CUSTOM_ENABLED" == "true" ] && [ "$variant_input" == "SukiSU" ]; then
               SUKISU_COMMIT=$(grep "^sukisu=" "$CONFIG_FILE" | cut -d'=' -f2)
               if [ -n "$SUKISU_COMMIT" ]; then
                 BRANCH="-s $SUKISU_COMMIT"
-                echo "SukiSU-Nova using custom commit: $SUKISU_COMMIT"
+                echo "SukiSU 使用自定义提交: $SUKISU_COMMIT"
               fi
             fi
           fi
 
           echo "BRANCH=$BRANCH" >> $GITHUB_ENV
-          echo "KSU branch: $BRANCH"
+          echo "KSU 分支: $BRANCH"
 
-      - name: Add KernelSU
-        if: inputs.ksu_mode != 'Disable KSU'
+      - name: 添加 KernelSU
+        if: inputs.ksu_mode != '禁用KSU'
         working-directory: ${{ env.KERNEL_ROOT }}
         env:
           KSU_COMMIT: ${{ inputs.ksu_commit }}
@@ -541,22 +549,22 @@ jobs:
           KSU_CERT_HASH: ${{ inputs.ksu_cert_hash }}
         run: |
           case "${{ inputs.ksu_variant }}" in
-            "SukiSU-Nova")
-              echo "Adding ${{ inputs.ksu_variant }}..."
-              curl -LSs "https://raw.githubusercontent.com/SukiSU-Nova/SukiSU-Nova/main/kernel/setup.sh" | bash $BRANCH
-              # Kernel-side KSU version source aligned with the latest officially uploaded Manager build:
-              # SukiSU-Nova version = 30000 + commit count of the branch REPO_BRANCH points to - 4001
-              # (the main branch is defined in kernel/Kbuild, the builtin branch in kernel/Makefile;
-              #  prefer the GitHub API, fall back to a local rev-list). Rewrite REPO_BRANCH to the official
-              # build commit so the kernel KSU version matches the fetched manager package exactly
+            "SukiSU")
+              echo "添加 ${{ inputs.ksu_variant }}..."
+              curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash $BRANCH
+              # 内核侧 KSU 版本来源对齐官方最新上传 Manager 构建：
+              # SukiSU 版本号 = 40000 + REPO_BRANCH 指向分支的提交数 - 2815
+              #（main 分支定义在 kernel/Kbuild，builtin 分支定义在 kernel/Makefile，
+              #  优先 GitHub API，回退本地 rev-list）。将 REPO_BRANCH 改写为官方
+              # 构建提交，保证内核 KSU 版本与拉取的管理器安装包严格一致
               if [ -n "$KSU_COMMIT" ] && [ "$BRANCH" != "-s main" ] && [ "$BRANCH" != "-s builtin" ]; then
-                echo "SukiSU-Nova using custom commit ($BRANCH); skipping manager version alignment"
+                echo "SukiSU 使用自定义提交（$BRANCH），跳过管理器版本对齐"
               elif [ -n "$KSU_COMMIT" ]; then
                 if ! git -C KernelSU fetch origin "$KSU_COMMIT" 2>/dev/null; then
-                  echo "Official build commit $KSU_COMMIT already exists in the local clone; skipping fetch"
+                  echo "官方构建提交 $KSU_COMMIT 已存在于本地克隆，跳过 fetch"
                 fi
                 if ! git -C KernelSU cat-file -e "$KSU_COMMIT^{commit}" 2>/dev/null; then
-                  echo "::error::Official build commit $KSU_COMMIT is not in the KernelSU repository; cannot align the version source"
+                  echo "::error::官方构建提交 $KSU_COMMIT 不在 KernelSU 仓库中，无法对齐版本来源"
                   exit 1
                 fi
                 if [ "$BRANCH" = "-s builtin" ]; then
@@ -565,47 +573,55 @@ jobs:
                   KSU_VERSION_SOURCE="KernelSU/kernel/Kbuild"
                 fi
                 if ! sed -i -E "s|^(REPO_BRANCH[[:space:]]*[:?+]?=)[[:space:]]*main[[:space:]]*\$|\1 $KSU_COMMIT|" "$KSU_VERSION_SOURCE"; then
-                  echo "::error::Failed to rewrite REPO_BRANCH in $KSU_VERSION_SOURCE; cannot align the manager version"
+                  echo "::error::改写 $KSU_VERSION_SOURCE 的 REPO_BRANCH 失败，无法对齐管理器版本"
                   exit 1
                 fi
                 if ! grep -qE "^REPO_BRANCH[[:space:]]*[:?+]?=[[:space:]]*$KSU_COMMIT[[:space:]]*\$" "$KSU_VERSION_SOURCE"; then
-                  echo "::error::Could not align REPO_BRANCH in $KSU_VERSION_SOURCE (the upstream structure may have changed); cannot align the manager version"
+                  echo "::error::未能在 $KSU_VERSION_SOURCE 中对齐 REPO_BRANCH（上游结构可能已变化），无法对齐管理器版本"
                   exit 1
                 fi
-                echo "SukiSU-Nova kernel-side version source aligned to the official uploaded build commit $KSU_COMMIT (KSU version $((30000 + $(git -C KernelSU rev-list --count "$KSU_COMMIT") - 4001)))"
+                echo "SukiSU 内核侧版本来源已对齐官方上传构建提交 $KSU_COMMIT (KSU 版本 $((40000 + $(git -C KernelSU rev-list --count "$KSU_COMMIT") - 2815)))"
               fi
               bash "$GITHUB_WORKSPACE/scripts/ksu_post_setup.sh" KernelSU sukisu
               ;;
             "BakaSU")
-              echo "Adding BakaSU..."
+              echo "添加 BakaSU..."
               curl -LSs "https://raw.githubusercontent.com/Baka-SU/BakaSU/main/kernel/setup.sh" | bash $BRANCH
-              # Kernel-side KernelSU is checked out at the same commit as the latest officially uploaded Manager build
-              # (Kbuild computes the version as 30700 + git commit count, from the same source and with the same value as the official manager versionCode),
-              # so the kernel KSU version matches the fetched manager package exactly
+              # 内核侧 KernelSU 检出到官方最新上传 Manager 构建的同一提交
+              #（Kbuild 以 30700 + git 提交数 计算版本，与官方管理器 versionCode 同源同值），
+              # 保证内核 KSU 版本与拉取的管理器安装包严格一致
               if [ -n "$KSU_COMMIT" ]; then
                 if ! git -C KernelSU checkout --detach "$KSU_COMMIT" 2>/dev/null; then
                   git -C KernelSU fetch origin "$KSU_COMMIT"
                   git -C KernelSU checkout --detach "$KSU_COMMIT"
                 fi
-                echo "KernelSU checked out at the official uploaded build commit $KSU_COMMIT (KSU version $((30700 + $(git -C KernelSU rev-list --count HEAD))))"
+                if [ "$(git -C KernelSU rev-parse HEAD)" != "$KSU_COMMIT" ]; then
+                  echo "::error::KernelSU 检出官方构建提交 $KSU_COMMIT 失败，无法对齐管理器版本"
+                  exit 1
+                fi
+                echo "KernelSU 已检出到官方上传构建提交 $KSU_COMMIT (KSU 版本 $((30700 + $(git -C KernelSU rev-list --count HEAD))))"
               fi
               bash "$GITHUB_WORKSPACE/scripts/ksu_post_setup.sh" KernelSU bakasu
               ;;
             "FinaSU")
-              echo "Adding ${{ inputs.ksu_variant }}..."
+              echo "添加 ${{ inputs.ksu_variant }}..."
               git clone https://github.com/LyraVoid/FinaSU.git KernelSU
-              # Kernel side is checked out at the commit selected by get-manager: for the Release channel it is the Release tag commit,
-              # for the Latest channel it is the latest build commit of build-manager.yml; Kbuild computes the version as 30000 + git
-              # commit count, from the same source and with the same value as the corresponding manager versionCode
+              # 内核侧检出到 get-manager 选定的提交：正式通道为 Release 标签提交，
+              # 最新通道为 build-manager.yml 最新构建提交；Kbuild 以 30000 + git
+              # 提交数计算版本，与对应管理器 versionCode 同源同值
               if [ -n "$KSU_COMMIT" ]; then
                 if ! git -C KernelSU checkout --detach "$KSU_COMMIT" 2>/dev/null; then
                   git -C KernelSU fetch origin "$KSU_COMMIT"
                   git -C KernelSU checkout --detach "$KSU_COMMIT"
                 fi
-                echo "KernelSU checked out at the official uploaded build commit $KSU_COMMIT (KSU version $((30000 + $(git -C KernelSU rev-list --count HEAD))))"
+                if [ "$(git -C KernelSU rev-parse HEAD)" != "$KSU_COMMIT" ]; then
+                  echo "::error::KernelSU 检出官方构建提交 $KSU_COMMIT 失败，无法对齐管理器版本"
+                  exit 1
+                fi
+                echo "KernelSU 已检出到官方上传构建提交 $KSU_COMMIT (KSU 版本 $((30000 + $(git -C KernelSU rev-list --count HEAD))))"
               fi
-              # FinaSU's bundled kernel/setup.sh still clones upstream tiann/KernelSU, so do it manually here
-              # in-tree integration: symlink the driver directory and hook up Makefile / Kconfig
+              # FinaSU 自带的 kernel/setup.sh 仍克隆上游 tiann/KernelSU，此处手动完成
+              # in-tree 集成：软链驱动目录并挂载 Makefile / Kconfig
               DRIVER_DIR="$KERNEL_ROOT/common/drivers"
               ln -sfn "$(realpath --relative-to="$DRIVER_DIR" "$KERNEL_ROOT/KernelSU/kernel")" "$DRIVER_DIR/kernelsu"
               grep -q "obj-.*CONFIG_KSU.*kernelsu/" "$DRIVER_DIR/Makefile" || \
@@ -613,31 +629,31 @@ jobs:
               if ! grep -q 'source "drivers/kernelsu/Kconfig"' "$DRIVER_DIR/Kconfig"; then
                 sed -i "/endmenu/i source \"drivers/kernelsu/Kconfig\"" "$DRIVER_DIR/Kconfig"
               fi
-              # SUSFS scenario: upstream already integrates it natively in-tree, so no driver-side patch is needed,
-              # and scripts/susfs_fixes/apply.sh validates and applies the main kernel-side patch in one place
+              # SUSFS 场景：上游已树内原生集成，驱动侧无需补丁，
+              # 由 scripts/susfs_fixes/apply.sh 统一校验并应用内核侧主补丁
 
-              # Inject the FinaSU official manager signing certificate into the kernel's second trust slot (EXPECTED_SIZE2/HASH2).
-              # Without injection the kernel only trusts the upstream KernelSU default slot, the official KernelSU manager would take over the
-              # manager identity, and the FinaSU manager would show "Not installed".
+              # 将 FinaSU 官方管理器签名证书注入内核第二信任槽（EXPECTED_SIZE2/HASH2）。
+              # 不注入时内核仅信任上游 KernelSU 默认槽，官方 KernelSU 管理器会抢占
+              # manager 身份，FinaSU 管理器显示"未安装"。
               if [ -z "$KSU_CERT_SIZE" ] || [ -z "$KSU_CERT_HASH" ]; then
-                echo "Manager certificate was not passed in by get-manager; falling back to extracting it from the latest FinaSU Release APK..."
+                echo "管理器证书未由 get-manager 传入，回退到 FinaSU 最新 Release APK 提取..."
                 REL_APK=$(mktemp -d)/manager.apk
                 REL_JSON=""
                 for ATTEMPT in 1 2 3; do
                   REL_JSON=$(curl -s --fail --max-time 30 \
                     "https://api.github.com/repos/LyraVoid/FinaSU/releases/latest") \
                     && [ -n "$REL_JSON" ] && break
-                  echo "Failed to fetch Release info, retrying ($ATTEMPT/3)..."
+                  echo "获取 Release 信息失败，重试 ($ATTEMPT/3)..."
                   sleep 5
                 done
                 REL_URL=$(printf '%s' "$REL_JSON" | python3 -c \
                   "import json,sys; d=json.load(sys.stdin); print(next(a['browser_download_url'] for a in d.get('assets',[]) if a['name'].endswith('.apk')))" 2>/dev/null || true)
                 if [ -z "$REL_URL" ]; then
-                  echo "::error::Cannot obtain the FinaSU manager signing certificate: get-manager did not pass it and the latest Release has no APK asset, so the FinaSU manager will not be recognized by the kernel"
+                  echo "::error::无法获取 FinaSU 管理器签名证书：get-manager 未传入且最新 Release 中没有 APK 资产，FinaSU 管理器将无法被内核识别"
                   exit 1
                 fi
                 curl -sL --fail --retry 3 --max-time 300 -o "$REL_APK" "$REL_URL" || {
-                  echo "::error::Failed to download the FinaSU Release APK; cannot extract the manager signing certificate"
+                  echo "::error::下载 FinaSU Release APK 失败，无法提取管理器签名证书"
                   exit 1
                 }
                 CERT_INFO=$(python3 "$GITHUB_WORKSPACE/scripts/finasu_compat/extract_manager_cert.py" "$REL_APK" | head -n1)
@@ -645,10 +661,10 @@ jobs:
                 KSU_CERT_HASH=$(echo "$CERT_INFO" | awk '{print $2}')
               fi
               if [ -z "$KSU_CERT_SIZE" ] || [ -z "$KSU_CERT_HASH" ]; then
-                echo "::error::Failed to extract the FinaSU manager signing certificate; the FinaSU manager will not be recognized by the kernel"
+                echo "::error::FinaSU 管理器签名证书提取失败，FinaSU 管理器将无法被内核识别"
                 exit 1
               fi
-              echo "Injecting the FinaSU manager signing certificate into the kernel's second trust slot: size=$KSU_CERT_SIZE sha256=$KSU_CERT_HASH"
+              echo "注入 FinaSU 管理器签名证书到内核第二信任槽: size=$KSU_CERT_SIZE sha256=$KSU_CERT_HASH"
               awk -v size="$KSU_CERT_SIZE" -v hash="$KSU_CERT_HASH" '
                 !done && /^ccflags-y \+= -DEXPECTED_HASH=/ {
                   print
@@ -664,14 +680,35 @@ jobs:
               grep -q "^KSU_EXPECTED_SIZE2 := " KernelSU/kernel/Kbuild \
                 && grep -q "^KSU_EXPECTED_HASH2 := " KernelSU/kernel/Kbuild \
                 && grep -q "^KSU_SECOND_SIGNATURE_RELEASE := 1" KernelSU/kernel/Kbuild \
-                || { echo "::error::Kbuild injection failed (anchor line missing; the FinaSU upstream Kbuild structure may have changed)"; exit 1; }
-              # Consistent with SukiSU-Nova/BakaSU: the @<branch> in the full kernel version is fixed to the brand name
-              # (CI checks out a detached commit, where abbrev-ref shows @HEAD);
-              # must be called after the certificate injection above (awk rewrites Kbuild)
+                || { echo "::error::Kbuild 注入失败（锚点行缺失，FinaSU 上游 Kbuild 结构可能已变化）"; exit 1; }
+              # 与 SukiSU/BakaSU 一致：内核完整版本的 @<branch> 固定为品牌名
+              # （CI 检出的是 detached 提交，abbrev-ref 显示 @HEAD）；
+              # 必须在上方证书注入（awk 重写 Kbuild）之后调用
               bash "$GITHUB_WORKSPACE/scripts/ksu_post_setup.sh" KernelSU finasu
               ;;
+            "KernelSU")
+              echo "添加 ${{ inputs.ksu_variant }}..."
+              curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash $BRANCH
+              # 内核侧检出到 get-manager 选定的提交（留空则跟随 main HEAD）
+              if [ -n "$KSU_COMMIT" ]; then
+                if ! git -C KernelSU checkout --detach "$KSU_COMMIT" 2>/dev/null; then
+                  git -C KernelSU fetch origin "$KSU_COMMIT"
+                  git -C KernelSU checkout --detach "$KSU_COMMIT"
+                fi
+                if [ "$(git -C KernelSU rev-parse HEAD)" != "$KSU_COMMIT" ]; then
+                  echo "::error::KernelSU 检出官方构建提交 $KSU_COMMIT 失败，无法对齐管理器版本"
+                  exit 1
+                fi
+                echo "KernelSU 已检出到官方上传构建提交 $KSU_COMMIT (KSU 版本 $((30000 + $(git -C KernelSU rev-list --count HEAD))))"
+              fi
+              # Original KernelSU：drivers/kernelsu 已由 setup.sh 集成进内核树，
+              # 不需要额外的软链/Makefile/Kconfig 修改；也不需要证书注入
+              #（官方管理器使用默认第一信任槽，与主线 KernelSU 一致）。
+              # 不调用 ksu_post_setup.sh：原版 Kbuild 版本字符串保持 @main/@HEAD。
+              ;;
+
             *)
-              echo "Unknown variant: ${{ inputs.ksu_variant }}" >&2
+              echo "未知变体: ${{ inputs.ksu_variant }}" >&2
               exit 1
               ;;
           esac
@@ -680,24 +717,29 @@ jobs:
             KSU_LATEST_COMMIT_DATE=$(git -C KernelSU log -1 --date=format:'%Y-%m-%d %H:%M:%S %z' --format='%cd')
             echo "KSU_LATEST_COMMIT_DATE=$KSU_LATEST_COMMIT_DATE" >> $GITHUB_ENV
           else
-            echo "KSU_LATEST_COMMIT_DATE=Unknown" >> $GITHUB_ENV
+            echo "KSU_LATEST_COMMIT_DATE=未知" >> $GITHUB_ENV
           fi
 
-      - name: Compute AnyKernel3 naming version
+      - name: 计算 AnyKernel3 命名版本
         working-directory: ${{ env.KERNEL_ROOT }}
         run: |
           KSU_VERSION=""
-          if [ -n "${{ inputs.ksu_commit }}" ] && [ -d KernelSU/.git ]; then
+          # 优先使用管理器 versionCode（与管理器内核版本完全一致，如 32730）
+          MANAGER_VER="${{ inputs.manager_ver }}"
+          if [ "${{ inputs.ksu_variant }}" = "KernelSU" ] && [ -n "$MANAGER_VER" ]; then
+            KSU_VERSION="$MANAGER_VER"
+          elif [ -n "${{ inputs.ksu_commit }}" ] && [ -d KernelSU/.git ]; then
             KSU_COUNT=$(git -C KernelSU rev-list --count "${{ inputs.ksu_commit }}" 2>/dev/null || echo "")
             if [ -n "$KSU_COUNT" ]; then
               case "${{ inputs.ksu_variant }}" in
-                SukiSU-Nova) KSU_VERSION=$((30000 + KSU_COUNT - 4001)) ;;
+                SukiSU) KSU_VERSION=$((40000 + KSU_COUNT - 2815)) ;;
                 BakaSU) KSU_VERSION=$((30700 + KSU_COUNT)) ;;
                 FinaSU) KSU_VERSION=$((30000 + KSU_COUNT)) ;;
+                KernelSU) KSU_VERSION=$((30000 + KSU_COUNT)) ;;
               esac
             fi
           fi
-          if [ "${{ inputs.ksu_mode }}" = "Disable KSU" ]; then
+          if [ "${{ inputs.ksu_mode }}" = "禁用KSU" ]; then
             AK3_NAME="KSU-free-${CONFIG}"
           elif [ -n "$KSU_VERSION" ]; then
             AK3_NAME="${{ inputs.ksu_variant }}-${KSU_VERSION}-${CONFIG}"
@@ -705,38 +747,72 @@ jobs:
             AK3_NAME="${{ inputs.ksu_variant }}_kernel-${CONFIG}"
           fi
           echo "AK3_NAME=$AK3_NAME" >> $GITHUB_ENV
-          echo "AnyKernel3 name: $AK3_NAME"
+          echo "AnyKernel3 命名: $AK3_NAME"
 
-      # FinaSU's kernel-side SUSFS integration has been merged into scripts/susfs_fixes/apply.sh:
-      # since 5b83330b (2026-10-23) upstream integrates SUSFS natively in-tree, in the same
-      # "no driver-side patch" form as SukiSU-Nova/BakaSU, validated and applied together by the "Apply SUSFS patch" step
+      # FinaSU 的内核侧 SUSFS 集成已并入 scripts/susfs_fixes/apply.sh：
+      # 上游自 5b83330b（2026-10-23）起树内原生集成 SUSFS，与 SukiSU/BakaSU
+      # 同为「驱动侧不打补丁」形态，由「应用 SUSFS 补丁」步骤统一校验并应用
 
-      # SukiSU-Nova's builtin branch (built-in + SUSFS product line) and main branch are independent of each other,
-      # and the official manager APK is always built from the main branch. When main raises
-      # KERNEL_SU_UAPI_VERSION (e.g. 3b60791 UAPI 6 added
-      # KSU_IOCTL_LOOKUP_SYMBOLS + KSU_GET_INFO_FLAG_PREINIT), the kernel UAPI
-      # of the builtin checkout falls behind the manager, and the home page reports "Kernel update required"
-      # (Natives.kt: managerUAPIVersion > kernelUAPIVersion).
-      # This step syncs dynamically: it reads the official main uapi/supercall.h, ports the missing constants/structs
-      # into the builtin checkout verbatim from main and raises the UAPI number; when UAPI >= 6 it also
-      # injects the LOOKUP_SYMBOLS handler + symbol_resolver kernel-side capability;
-      # it is skipped automatically once upstream builtin syncs on its own; see scripts/ksu_uapi_sync/sync_uapi.sh
-      - name: Sync SukiSU-Nova kernel UAPI version (align with the official manager)
-        if: inputs.ksu_variant == 'SukiSU-Nova' && inputs.ksu_mode != 'Disable KSU'
+      # SukiSU 的 builtin 分支（内建+SUSFS 产品线）与 main 分支相互独立，
+      # 官方管理器 APK 始终按 main 分支构建。main 抬升
+      # KERNEL_SU_UAPI_VERSION 时（如 3b60791 UAPI 6 新增
+      # KSU_IOCTL_LOOKUP_SYMBOLS + KSU_GET_INFO_FLAG_PREINIT），builtin
+      # 检出内核 UAPI 落后于管理器，首页报"需要更新内核"
+      # （Natives.kt: managerUAPIVersion > kernelUAPIVersion）。
+      # 此步骤动态同步：读取官方 main 的 uapi/supercall.h，把缺失常量/结构
+      # 按 main 原文移植进 builtin 检出并抬升 UAPI 号，UAPI >= 6 时附带
+      # 注入 LOOKUP_SYMBOLS 处理器 + symbol_resolver 内核侧能力；
+      # 上游 builtin 自行同步后自动跳过，详见 scripts/ksu_uapi_sync/sync_uapi.sh
+      - name: 同步 SukiSU 内核 UAPI 版本（对齐官方管理器）
+        if: inputs.ksu_variant == 'SukiSU' && inputs.ksu_mode != '禁用KSU'
         working-directory: ${{ env.KERNEL_ROOT }}
         run: bash "$GITHUB_WORKSPACE/scripts/ksu_uapi_sync/sync_uapi.sh" KernelSU
 
-      # The hook/lsm_hook.c of the SukiSU-Nova builtin branch still calls
-      # security_add_hooks(hooks, count, "ksu") with the old signature; 6.8+ kernels require const struct lsm_id *,
-      # so the android16-6.12 GKI build fails outright.
-      # The patch is guarded internally by LINUX_VERSION_CODE, so behavior is unchanged on kernels 6.7 and below,
-      # and it is skipped automatically by content detection once SukiSU-Nova fixes this upstream.
-      - name: Apply SukiSU-Nova kernel API compatibility patch (6.8+ lsm_id)
-        if: inputs.ksu_variant == 'SukiSU-Nova' && inputs.ksu_mode != 'Disable KSU'
+      # SukiSU builtin 分支的 hook/lsm_hook.c 仍以旧签名调用
+      # security_add_hooks(hooks, count, "ksu")，6.8+ 内核要求 const struct lsm_id *，
+      # android16-6.12 GKI 编译直接失败。
+      # 补丁内部以 LINUX_VERSION_CODE 守卫，6.7 及以下内核行为不变，
+      # SukiSU 上游修复后按内容检测自动跳过。
+      - name: 应用 SukiSU 内核 API 兼容补丁 (6.8+ lsm_id)
+        if: inputs.ksu_variant == 'SukiSU' && inputs.ksu_mode != '禁用KSU'
         working-directory: ${{ env.KERNEL_ROOT }}
         run: bash "$GITHUB_WORKSPACE/scripts/sukisu_compat/apply.sh" KernelSU
 
-      - name: Apply SUSFS patch
+      # 原生 KernelSU（tiann/KernelSU）不自带 SUSFS 支持，需打入
+      # 10_enable_susfs_for_ksu.patch 以添加 CONFIG_KSU_SUSFS、susfs_init()
+      # 调用点以及 SUSFS 相关的 Kbuild/Kconfig 条目。否则 SUSFS 主补丁在
+      # fs/ 下引用的 KSU 钩子点无法链接，编译会报未定义符号。
+      - name: 为原生 KernelSU 启用 SUSFS
+        if: inputs.ksu_variant == 'KernelSU' && inputs.enable_susfs
+        working-directory: ${{ env.KERNEL_ROOT }}
+        env:
+          SUSFS4KSU: ${{ env.SUSFS4KSU }}
+        run: |
+          set -e
+          # 原生 KernelSU（tiann/KernelSU）不自带 SUSFS 支持。
+          # 优先应用 upstream 的 10_enable_susfs_for_ksu.patch；
+          # 然后运行 apply_kernelsu_susfs.py 确保 init.c 中有 susfs_init()。
+          # apply_kernelsu_susfs.py 是集成权威：无论补丁是否应用，它都会
+          # 确保 Kconfig/init.c/Kbuild 都正确适配 SUSFS。
+          PATCH="${SUSFS4KSU}/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
+          if [ -f "$PATCH" ]; then
+            echo "正在应用 10_enable_susfs_for_ksu.patch（upstream）..."
+            patch -p1 --no-backup-if-mismatch -d KernelSU < "$PATCH" || {
+              echo "::warning::补丁部分 hunks 跳过，apply_kernelsu_susfs.py 将尝试补全"
+            }
+          else
+            echo "未找到 $PATCH（susfs4ksu 仓库结构可能已变化），仅运行 apply_kernelsu_susfs.py"
+          fi
+
+          echo "正在运行 apply_kernelsu_susfs.py：确保 KernelSU SUSFS 集成..."
+          python3 "${{ env.KERNEL_ROOT }}/../scripts/susfs_fixes/apply_kernelsu_susfs.py" || {
+            echo "::error::apply_kernelsu_susfs.py 无法集成 SUSFS，构建中断" >&2
+            exit 1
+          }
+
+          echo "原生 KernelSU SUSFS 支持已添加"
+
+      - name: 应用 SUSFS 补丁
         if: inputs.enable_susfs && env.SUSFS_SKIPPED != 'true'
         working-directory: ${{ env.KERNEL_ROOT }}
         env:
@@ -747,32 +823,32 @@ jobs:
           SUB_LEVEL: ${{ inputs.sub_level }}
         run: bash "$GITHUB_WORKSPACE/scripts/susfs_fixes/apply.sh"
           
-      - name: Clone Droidspaces patch repository
+      - name: 克隆 Droidspaces 补丁仓库
         if: inputs.droidspaces != 'off'
         run: |
           if git clone --depth 1 https://github.com/ravindu644/Droidspaces-OSS.git /tmp/Droidspaces-OSS; then
             echo "DROIDSPACES_PATCHES=/tmp/Droidspaces-OSS/Documentation/resources/kernel-patches/GKI" >> $GITHUB_ENV
           elif [ "$SKIP_INCOMPATIBLE" = "true" ]; then
-            echo "::warning title=Droidspaces skipped::Failed to clone the Droidspaces patch repository; Droidspaces feature skipped"
+            echo "::warning title=Droidspaces 已跳过::Droidspaces 补丁仓库克隆失败，已跳过 Droidspaces 功能"
             if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
               echo "" >> "$GITHUB_STEP_SUMMARY"
-              echo "> ⏭️ **Droidspaces (virtualization support)** skipped automatically: failed to clone the patch repository (build not interrupted)" >> "$GITHUB_STEP_SUMMARY"
+              echo "> ⏭️ **Droidspaces（虚拟化支持）** 已自动跳过：补丁仓库克隆失败（构建未中断）" >> "$GITHUB_STEP_SUMMARY"
             fi
             echo "DROIDSPACES_SKIPPED=true" >> "$GITHUB_ENV"
           else
-            echo "::error::Failed to clone the Droidspaces patch repository"
+            echo "::error::Droidspaces 补丁仓库克隆失败"
             exit 1
           fi
 
-      - name: Back up baseline defconfig
+      - name: 备份基准 defconfig
         run: cp "$DEFCONFIG" "$DEFCONFIG.orig"
 
-      - name: Integrate NoMount mount meta-module
+      - name: 集成 NoMount 挂载元模块
         if: inputs.use_nomount
         working-directory: ${{ env.KERNEL_ROOT }}/common
         run: |
-          # NoMount registers its subsystem at the fs/ layer and does not depend on traditional mount points, so it can coexist with any KSU variant and SUSFS.
-          # CONFIG_NOMOUNT must be appended after "Back up baseline defconfig" so that the 6.1+ bazel fragment can capture it.
+          # NoMount 在 fs/ 层注册子系统，不依赖传统挂载点，可与任意 KSU 变体及 SUSFS 共存。
+          # 必须在「备份基准 defconfig」之后追加 CONFIG_NOMOUNT，6.1+ 的 bazel fragment 才能捕获。
           set -euo pipefail
           NOMOUNT_SETUP_URL="https://raw.githubusercontent.com/maxsteeel/nomount/refs/heads/dev/kernel/setup.sh"
 
@@ -783,10 +859,10 @@ jobs:
           nomount_fail() {
             nomount_cleanup
             if [ "$SKIP_INCOMPATIBLE" = "true" ]; then
-              echo "::warning title=NoMount skipped::$1; NoMount meta-module integration skipped"
+              echo "::warning title=NoMount 已跳过::$1，已跳过 NoMount 元模块集成"
               if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
                 echo "" >> "$GITHUB_STEP_SUMMARY"
-                echo "> ⏭️ **NoMount meta-module** skipped automatically: $1 (build not interrupted)" >> "$GITHUB_STEP_SUMMARY"
+                echo "> ⏭️ **NoMount 元模块** 已自动跳过：$1（构建未中断）" >> "$GITHUB_STEP_SUMMARY"
               fi
               echo "NOMOUNT_SKIPPED=true" >> "$GITHUB_ENV"
               exit 0
@@ -795,22 +871,22 @@ jobs:
             exit 1
           }
 
-          echo "Fetching and running the NoMount upstream integration script (dev)..."
+          echo "拉取并执行 NoMount 上游集成脚本 (dev)..."
           if ! curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors "$NOMOUNT_SETUP_URL" | bash -s -- dev; then
-            nomount_fail "NoMount integration script failed"
+            nomount_fail "NoMount 集成脚本执行失败"
           fi
-          [ -L "fs/nomount" ] || nomount_fail "fs/nomount symlink is missing after NoMount integration"
-          grep -q 'source "fs/nomount/Kconfig"' fs/Kconfig || nomount_fail "fs/Kconfig is not registered after NoMount integration"
-          echo "NoMount integration complete, commit: $(git -C NoMount rev-parse HEAD)"
+          [ -L "fs/nomount" ] || nomount_fail "NoMount 集成后 fs/nomount 软链接缺失"
+          grep -q 'source "fs/nomount/Kconfig"' fs/Kconfig || nomount_fail "NoMount 集成后 fs/Kconfig 未注册"
+          echo "NoMount 集成完成，commit: $(git -C NoMount rev-parse HEAD)"
 
           if ! grep -q '^CONFIG_NOMOUNT=y' "$DEFCONFIG"; then
             echo "CONFIG_NOMOUNT=y" >> "$DEFCONFIG"
-            echo "CONFIG_NOMOUNT=y enabled"
+            echo "已启用 CONFIG_NOMOUNT=y"
           else
-            echo "CONFIG_NOMOUNT=y already present; skipping"
+            echo "CONFIG_NOMOUNT=y 已存在，跳过"
           fi
 
-      - name: Integrate Droidspaces support
+      - name: 集成 Droidspaces 支持
         if: inputs.droidspaces != 'off' && env.DROIDSPACES_SKIPPED != 'true'
         working-directory: ${{ env.KERNEL_ROOT }}/common
         run: |
@@ -819,7 +895,7 @@ jobs:
 
           # 678 -> 6_7_8, 123 -> 1_2_3, 345 -> 3_4_5
           SLOT_NAME=$(echo "$SLOT" | sed 's/\(.\)/\1_/g; s/_$//')
-          echo "Applying the Droidspaces SYSVIPC kABI fix patch (slot: $SLOT / $SLOT_NAME)..."
+          echo "应用 Droidspaces SYSVIPC kABI 修复补丁 (槽位: $SLOT / $SLOT_NAME)..."
           case "$KERNEL_VER" in
             6.12)
               PATCH_FILE="$DROIDSPACES_PATCHES/kernel-6.12/001.GKI-6.12-or-above-fix_sysvipc_kabi.patch"
@@ -828,63 +904,63 @@ jobs:
               PATCH_FILE="$DROIDSPACES_PATCHES/below-kernel-6.12/001.GKI-below-6.12-fix_sysvipc_kabi_${SLOT_NAME}.patch"
               ;;
             *)
-              echo "::warning::Droidspaces: unsupported kernel version $KERNEL_VER; skipping patch"
+              echo "::warning::Droidspaces: 未适配的内核版本 $KERNEL_VER，跳过补丁"
               exit 0
               ;;
           esac
           if [ ! -f "$PATCH_FILE" ]; then
             if [ "$SKIP_INCOMPATIBLE" = "true" ]; then
-              echo "::warning title=Droidspaces skipped::Patch file $PATCH_FILE not found; Droidspaces feature skipped"
+              echo "::warning title=Droidspaces 已跳过::未找到补丁文件 $PATCH_FILE，已跳过 Droidspaces 功能"
               if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
                 echo "" >> "$GITHUB_STEP_SUMMARY"
-                echo "> ⏭️ **Droidspaces (virtualization support)** skipped automatically: patch file $PATCH_FILE not found (build not interrupted)" >> "$GITHUB_STEP_SUMMARY"
+                echo "> ⏭️ **Droidspaces（虚拟化支持）** 已自动跳过：未找到补丁文件 $PATCH_FILE（构建未中断）" >> "$GITHUB_STEP_SUMMARY"
               fi
               echo "DROIDSPACES_SKIPPED=true" >> "$GITHUB_ENV"
               exit 0
             fi
-            echo "::error::Droidspaces patch file not found: $PATCH_FILE"
+            echo "::error::未找到 Droidspaces 补丁文件: $PATCH_FILE"
             exit 1
           fi
           if ! patch -p1 --forward < "$PATCH_FILE"; then
-            echo "::warning::SYSVIPC kABI patch failed to apply; it may already be applied or the context does not match"
+            echo "::warning::SYSVIPC kABI 补丁应用失败，可能已应用或上下文不匹配"
           fi
 
-          # 5.10 and below also need the POSIX_MQUEUE kABI fix
+          # 5.10 及以下还需要 POSIX_MQUEUE 的 kABI 修复
           if [ "$KERNEL_VER" = "5.10" ]; then
-            echo "Applying the Droidspaces POSIX_MQUEUE kABI fix patch (5.10)..."
+            echo "应用 Droidspaces POSIX_MQUEUE kABI 修复补丁 (5.10)..."
             POSIX_PATCH="$DROIDSPACES_PATCHES/below-kernel-6.12/002.5.10_or_lower_use_android_abi_padding_for_posix_mqueue.patch"
             if ! patch -p1 --forward < "$POSIX_PATCH"; then
-              echo "::warning::POSIX_MQUEUE kABI patch failed to apply; it may already be applied or the context does not match"
+              echo "::warning::POSIX_MQUEUE kABI 补丁应用失败，可能已应用或上下文不匹配"
             fi
           fi
 
-          # On Android 16 / 6.12, rust_binder.ko references
-          # init_ipc_ns and put_ipc_ns once IPC_NS is enabled, but the current AOSP common branch does not export these two symbols yet.
-          # Add the exports here so modpost does not fail on undefined symbols.
+          # Android 16 / 6.12 的 rust_binder.ko 在启用 IPC_NS 后会引用
+          # init_ipc_ns 与 put_ipc_ns，但当前 AOSP common 分支尚未导出这两个符号。
+          # 这里补齐导出，避免 modpost 因 undefined symbol 失败。
           if [ "$KERNEL_VER" = "6.12" ]; then
             if [ -f "ipc/msgutil.c" ] && ! grep -qF 'EXPORT_SYMBOL(init_ipc_ns);' "ipc/msgutil.c"; then
               sed -i '/^struct msg_msgseg {/i EXPORT_SYMBOL(init_ipc_ns);' "ipc/msgutil.c"
-              echo "Added symbol export for init_ipc_ns"
+              echo "已为 init_ipc_ns 补充符号导出"
             fi
 
             if [ -f "ipc/namespace.c" ] && ! grep -qF 'EXPORT_SYMBOL(put_ipc_ns);' "ipc/namespace.c"; then
               sed -i '/^static struct ns_common \*ipcns_get(/i EXPORT_SYMBOL(put_ipc_ns);' "ipc/namespace.c"
-              echo "Added symbol export for put_ipc_ns"
+              echo "已为 put_ipc_ns 补充符号导出"
             fi
           fi
 
-          echo "Adding Droidspaces kernel config..."
-          # Process each one per the documented rules: skip if already enabled, replace if "# not set", append if absent
+          echo "添加 Droidspaces 内核配置..."
+          # 按文档规则逐个处理: 已启用则跳过, "# not set" 则替换, 不存在则追加
           enable_config() {
             local cfg="$1"
             if grep -q "^${cfg}=y" "$DEFCONFIG"; then
-              echo "  Already enabled: $cfg"
+              echo "  已启用: $cfg"
             elif grep -q "^# ${cfg} is not set" "$DEFCONFIG"; then
               sed -i "s/^# ${cfg} is not set$/${cfg}=y/" "$DEFCONFIG"
-              echo "  Switched: $cfg"
+              echo "  已切换: $cfg"
             else
               echo "${cfg}=y" >> "$DEFCONFIG"
-              echo "  Added: $cfg"
+              echo "  已添加: $cfg"
             fi
           }
 
@@ -898,18 +974,18 @@ jobs:
             if config_defined "$cfg"; then
               enable_config "$cfg"
             else
-              echo "  Not defined in the current kernel: $cfg, skipping"
+              echo "  当前内核未定义: $cfg，跳过"
             fi
           }
 
-          # Required config
+          # 必要配置
           enable_config CONFIG_SYSVIPC
           enable_config CONFIG_POSIX_MQUEUE
           enable_config CONFIG_IPC_NS
           enable_config CONFIG_PID_NS
           enable_config CONFIG_DEVTMPFS
 
-          # Optional: network-related config (Docker/NAT mode)
+          # 可选: 网络相关配置 (Docker/NAT 模式)
           enable_config_if_defined CONFIG_NETFILTER_XT_MATCH_ADDRTYPE
           enable_config_if_defined CONFIG_NETFILTER_XT_TARGET_LOG
           enable_config_if_defined CONFIG_NETFILTER_XT_MATCH_RECENT
@@ -918,42 +994,42 @@ jobs:
           enable_config_if_defined CONFIG_IP_SET_HASH_NET
           enable_config_if_defined CONFIG_NETFILTER_XT_SET
 
-          # The symbol name of the REJECT target may differ across kernel versions; enable whichever config actually exists
+          # REJECT 目标在不同内核版本上的符号名可能不同，按实际存在的配置启用
           enable_config_if_defined CONFIG_NETFILTER_XT_TARGET_REJECT
           enable_config_if_defined CONFIG_IP_NF_TARGET_REJECT
 
-          echo "Droidspaces integration complete"
+          echo "Droidspaces 集成完成"
 
-          echo "GKI6.6 networking config for regular users (Droidspaces)"
-          # Specifically handle =n type configs (Android network permissions must be turned off)
+          echo "GKI6.6 普通用户联网专用配置 (Droidspaces)"
+          # 专门处理 =n 类型的配置（安卓网络权限必须关闭）
           disable_config() {
             local cfg="$1"
             if grep -q "^${cfg}=n" "$DEFCONFIG"; then
-              echo "  Disabled: $cfg"
+              echo "  已禁用: $cfg"
             elif grep -q "^${cfg}=y" "$DEFCONFIG"; then
               sed -i "s/^${cfg}=y$/${cfg}=n/" "$DEFCONFIG"
-              echo "  Turned off: $cfg"
+              echo "  已关闭: $cfg"
             else
               echo "# ${cfg} is not set" >> "$DEFCONFIG"
-              echo "  Added and disabled: $cfg"
+              echo "  已添加并禁用: $cfg"
             fi
           }
 
           if [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" ]]; then
-            # 1. Enable user namespaces (required)
+            # 1. 开启用户命名空间（必须）
             # enable_config_if_defined CONFIG_USER_NS
-            # 2. Turn off Android strict network control (required)
+            # 2. 关闭安卓严格网络控制（必须）
             disable_config CONFIG_ANDROID_PARANOID_NETWORK
           fi
 
-      - name: Inject NTSync kernel config
+      - name: 注入 NTSync 内核配置
         if: inputs.droidspaces != 'off' && inputs.droidspaces_ntsync && env.DROIDSPACES_SKIPPED != 'true'
         working-directory: ${{ env.KERNEL_ROOT }}/common
         run: |
           set -e
-          echo "=== Starting NTSync kernel patch injection ==="
-          echo "Android version: ${{ inputs.android_version }}"
-          echo "Kernel version: ${{ inputs.kernel_version }}"
+          echo "=== 开始注入 NTSync 内核补丁 ==="
+          echo "Android 版本: ${{ inputs.android_version }}"
+          echo "Kernel 版本: ${{ inputs.kernel_version }}"
 
           case "${{ inputs.android_version }}-${{ inputs.kernel_version }}" in
             android12-5.10)
@@ -972,17 +1048,17 @@ jobs:
               NTSYNC_PATCH="ntsync_compat_android16-6.12"
               ;;
             *)
-              echo "::warning::NTSync: ${{ inputs.android_version }} / ${{ inputs.kernel_version }} not supported; skipping patch"
+              echo "::warning::NTSync: 未适配 ${{ inputs.android_version }} / ${{ inputs.kernel_version }}，跳过补丁"
               exit 0
               ;;
           esac
 
           ntsync_fail() {
             if [ "$SKIP_INCOMPATIBLE" = "true" ]; then
-              echo "::warning title=NTSync skipped::$1; NTSync feature skipped"
+              echo "::warning title=NTSync 已跳过::$1，已跳过 NTSync 功能"
               if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
                 echo "" >> "$GITHUB_STEP_SUMMARY"
-                echo "> ⏭️ **NTSync** skipped automatically: $1 (build not interrupted)" >> "$GITHUB_STEP_SUMMARY"
+                echo "> ⏭️ **NTSync** 已自动跳过：$1（构建未中断）" >> "$GITHUB_STEP_SUMMARY"
               fi
               echo "NTSYNC_SKIPPED=true" >> "$GITHUB_ENV"
               exit 0
@@ -994,9 +1070,9 @@ jobs:
           NTSYNC_PATCH_URL="https://raw.githubusercontent.com/Goldzxcbug/Droidspaces_Kernel_patch/refs/heads/main/NTsync"
           NTSYNC_COMPAT_HEADER="$GITHUB_WORKSPACE/scripts/ntsync_compat/ntsync_lockdep_compat.h"
 
-          # Platform wiring: Kconfig/Makefile are written directly and idempotently.
-          # The upstream platform patch mixes "wiring" and the "lockdep backport" in one patch, so any context drift fails the whole step;
-          # the wiring itself is only two lines, and writing it separately makes it independent of the upstream patch context.
+          # 平台接线：Kconfig/Makefile 直接幂等写入。
+          # 上游平台补丁把「接线」和「lockdep 回移」混在一个 patch 里，任一上下文漂移都会让整步失败；
+          # 接线本身只有两行，独立写入后不再受上游补丁上下文影响。
           ntsync_wire_misc() {
             if ! grep -q '^config NTSYNC$' drivers/misc/Kconfig; then
               awk '
@@ -1019,7 +1095,7 @@ jobs:
               ' drivers/misc/Kconfig > drivers/misc/Kconfig.ntsync &&
                 mv drivers/misc/Kconfig.ntsync drivers/misc/Kconfig
             else
-              # If it exists but is marked BROKEN (6.12 mainline), remove the dependency, otherwise the symbol is never visible.
+              # 已存在但被标 BROKEN（6.12 主线）时摘掉依赖，否则该符号永远不可见。
               ntsync_strip_broken
             fi
 
@@ -1030,10 +1106,10 @@ jobs:
             ntsync_wired
           }
 
-          # lockdep compatibility layer: lockdep_assert()/LOCK_STATE_* were only introduced in v5.13.
-          # The include/linux/lockdep.h hunk of the upstream platform patch expects lockdep_assert_none_held_once() (v5.13+),
-          # so it is bound to be rejected on 5.10, while kernel/locking/lockdep.c still gets modified — a half-applied kernel will not compile at all.
-          # Here we only add the two symbols the driver actually uses, without touching kernel core locking code; semantics match upstream.
+          # lockdep 兼容层：v5.13 才引入 lockdep_assert()/LOCK_STATE_*。
+          # 上游平台补丁的 include/linux/lockdep.h hunk 期望 lockdep_assert_none_held_once()（v5.13+），
+          # 在 5.10 上必然 reject，而 kernel/locking/lockdep.c 却会被改掉 —— 半应用的内核根本编译不过。
+          # 这里只补驱动实际用到的两个符号，不动内核 core locking 代码，语义与上游一致。
           ntsync_inject_lockdep_compat() {
             cp "$NTSYNC_COMPAT_HEADER" drivers/misc/ntsync_lockdep_compat.h
             if ! grep -q 'ntsync_lockdep_compat.h' drivers/misc/ntsync.c; then
@@ -1047,8 +1123,8 @@ jobs:
               grep -q 'LOCK_STATE_NOT_HELD' include/linux/lockdep.h
           }
 
-          # 6.12 mainline already ships the NTSYNC sources, but Kconfig marks it depends on BROKEN,
-          # so it cannot count as "integrated"; otherwise CONFIG_NTSYNC=y in the defconfig would be dropped by Kconfig.
+          # 6.12 主线已带 NTSYNC 源码，但 Kconfig 里标了 depends on BROKEN，
+          # 此时不能算「已集成」，否则 defconfig 的 CONFIG_NTSYNC=y 会被 Kconfig 丢弃。
           ntsync_kconfig_block() {
             awk '
               /^config NTSYNC$/ { inblk = 1; print; next }
@@ -1080,72 +1156,72 @@ jobs:
           }
 
           if [[ -f drivers/misc/ntsync.c && -f include/uapi/linux/ntsync.h ]]; then
-            echo "NTSync sources already exist (shipped in mainline); skipping the base patch"
+            echo "NTSync 源码已存在（主线自带），跳过基础补丁"
           elif [[ ! -e drivers/misc/ntsync.c && ! -e include/uapi/linux/ntsync.h ]]; then
             wget -q "${NTSYNC_PATCH_URL}/ntsync_base.patch" ||
-              ntsync_fail "Failed to download the NTSync base patch"
+              ntsync_fail "NTSync 基础补丁下载失败"
             patch --batch --forward -p1 < ntsync_base.patch ||
-              ntsync_fail "Failed to apply the NTSync base patch (possibly incompatible with the current kernel)"
+              ntsync_fail "NTSync 基础补丁应用失败（可能不兼容当前内核）"
           else
-            ntsync_fail "NTSync sources are incomplete (driver and uapi header do not match)"
+            ntsync_fail "NTSync 源码不完整（驱动与 uapi 头文件不匹配）"
           fi
 
-          # Platform patch: sources, Kconfig/Makefile wiring and lockdep API must all be present to count as integrated.
+          # 平台补丁：源码、Kconfig/Makefile 接线、lockdep API 三者齐备才算已集成。
           if ntsync_wired && ntsync_has_lockdep_api; then
-            echo "NTSync already integrated; skipping the platform patch"
+            echo "NTSync 已集成，跳过平台补丁"
           else
             wget -q "${NTSYNC_PATCH_URL}/${NTSYNC_PATCH}.patch" ||
-              ntsync_fail "Failed to download NTSync platform patch ${NTSYNC_PATCH}.patch"
+              ntsync_fail "NTSync 平台补丁 ${NTSYNC_PATCH}.patch 下载失败"
 
-            # Dry-run first: if the patch is applied only partially (lockdep.c changed but lockdep.h not), the kernel cannot compile,
-            # so only apply for real when it can be applied completely; otherwise fall back to local wiring / the compatibility layer as a whole.
+            # 先 dry-run：补丁一旦部分应用（lockdep.c 改了、lockdep.h 没改）内核就无法编译，
+            # 因此只在能完整应用时才真正落盘，否则整体走本地接线/兼容层。
             if patch --batch --forward --dry-run -p1 < "${NTSYNC_PATCH}.patch" > /tmp/ntsync_platform.log 2>&1; then
-              echo "Upstream platform patch can be applied completely; applying it (including the lockdep backport)"
+              echo "上游平台补丁可完整应用，开始应用（含 lockdep 回移）"
               patch --batch --forward -p1 < "${NTSYNC_PATCH}.patch" ||
-                ntsync_fail "Failed to apply the NTSync platform patch (possibly incompatible with the current kernel)"
+                ntsync_fail "NTSync 平台补丁应用失败（可能不兼容当前内核）"
             else
-              echo "::notice title=NTSync compat layer::Upstream platform patch context does not match; using local wiring instead (functionally equivalent)"
+              echo "::notice title=NTSync 兼容层::上游平台补丁上下文不匹配，改用本地接线（功能等价）"
               sed -n '1,30p' /tmp/ntsync_platform.log
               EXTRA_FILES=$(grep '^diff --git' "${NTSYNC_PATCH}.patch" |
                 grep -v 'drivers/misc/Kconfig' | grep -v 'drivers/misc/Makefile' |
                 grep -v 'include/linux/lockdep.h' | grep -v 'kernel/locking/lockdep.c' || true)
               if [ -n "$EXTRA_FILES" ]; then
-                echo "::warning title=NTSync compat layer::The platform patch also contains unsupported changes, which were skipped: $EXTRA_FILES"
+                echo "::warning title=NTSync 兼容层::平台补丁还包含未适配的改动，已跳过：$EXTRA_FILES"
               fi
-              ntsync_wire_misc || ntsync_fail "Failed to write NTSync platform wiring"
+              ntsync_wire_misc || ntsync_fail "NTSync 平台接线写入失败"
               if ntsync_has_lockdep_api; then
-                echo "Kernel already provides lockdep_assert()/LOCK_STATE_*; lockdep compatibility layer not needed"
+                echo "内核已提供 lockdep_assert()/LOCK_STATE_*，无需 lockdep 兼容层"
               else
-                ntsync_inject_lockdep_compat || ntsync_fail "Failed to inject the NTSync lockdep compatibility layer"
+                ntsync_inject_lockdep_compat || ntsync_fail "NTSync lockdep 兼容层注入失败"
                 if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
                   echo "" >> "$GITHUB_STEP_SUMMARY"
-                  echo "> 🔧 **NTSync**: the upstream platform patch does not match this kernel's context; the local lockdep compatibility layer is enabled (functionally equivalent, build continues)" >> "$GITHUB_STEP_SUMMARY"
+                  echo "> 🔧 **NTSync**：上游平台补丁与本内核上下文不匹配，已启用本地 lockdep 兼容层（功能等价，构建继续）" >> "$GITHUB_STEP_SUMMARY"
                 fi
               fi
             fi
           fi
 
-          # Fallback: in some versions the platform patch only changes Kconfig (e.g. 6.12 only removes BROKEN); Makefile wiring must be ensured here.
-          ntsync_wired || ntsync_wire_misc || ntsync_fail "NTSync platform wiring is incomplete (Kconfig/Makefile)"
+          # 兜底：部分版本的平台补丁只改 Kconfig（如 6.12 仅摘 BROKEN），Makefile 接线需在此确保。
+          ntsync_wired || ntsync_wire_misc || ntsync_fail "NTSync 平台接线不完整（Kconfig/Makefile）"
 
           cd ..
 
-          # Config path
+          # 配置路径
           CONFIG_PATH="./common/arch/arm64/configs/gki_defconfig"
-          echo "Checking and enabling CONFIG_NTSYNC..."
+          echo "正在检查并启用 CONFIG_NTSYNC..."
 
-          # Remove the disabled marker, then append the enabled entry, so repeated runs stay idempotent.
+          # 移除未启用标记，再追加启用项，保证重复运行时保持幂等。
           sed -i '/CONFIG_NTSYNC is not set/d' "$CONFIG_PATH"
           if ! grep -q "^CONFIG_NTSYNC=y" "$CONFIG_PATH"; then
             echo "CONFIG_NTSYNC=y" >> "$CONFIG_PATH"
-            echo "✅ CONFIG_NTSYNC enabled successfully"
+            echo "✅ 已成功启用 CONFIG_NTSYNC"
           else
-            echo "✅ CONFIG_NTSYNC is already enabled"
+            echo "✅ CONFIG_NTSYNC 已处于启用状态"
           fi
 
-          echo "=== NTSync patch and config injection complete ==="
+          echo "=== NTSync 补丁与配置注入完成 ==="
 
-      - name: Apply Unicode bypass fix
+      - name: 应用 Unicode 绕过修复
         if: inputs.enable_susfs && env.SUSFS_SKIPPED != 'true'
         working-directory: ${{ env.KERNEL_ROOT }}/common
         run: |
@@ -1155,34 +1231,34 @@ jobs:
             patch -p1 --forward < "$ACTION_BUILD/patches/unicode_bypass_fix_6.1+.patch" || true
           fi
 
-          # When the main SUSFS patch or upstream ASB already contains the same fs/unicode change, the hunks of the bypass patch
-          # are judged by patch as previously applied: the source state is correct (it compiles fine), but the hunks
-          # are still written to .rej and pollute the Rejects artifact. The expected conflict is removed here;
-          # if mkutf8data.c still contains ignore_init, something is genuinely missing, so the .rej is kept for troubleshooting.
+          # SUSFS 主补丁或上游 ASB 已包含同款 fs/unicode 修改时，bypass 补丁的 hunk
+          # 会被 patch 判定为 previously applied：源码状态正确（可正常编译），但 hunk
+          # 仍被写入 .rej 并污染 Rejects 产物。此处剔除该预期冲突；
+          # mkutf8data.c 仍含 ignore_init 说明存在真实缺失，保留 .rej 以便排查。
           if [ -f fs/unicode/mkutf8data.c.rej ] && [ -f fs/unicode/mkutf8data.c ] \
             && ! grep -q 'ignore_init' fs/unicode/mkutf8data.c; then
-            echo "fs/unicode .rej is the expected conflict from an already-applied identical change; removing it (build not affected)"
+            echo "fs/unicode .rej 为已应用同款修改产生的预期冲突，剔除（构建未受影响）"
             rm -f fs/unicode/*.rej
           fi
 
-      - name: Configure ZRAM LZ4 patch stack
+      - name: 配置 ZRAM LZ4 补丁栈
         if: inputs.use_zram
         working-directory: ${{ env.KERNEL_ROOT }}/common
         run: |
-          # 6.12 and above have no upstream ZRAM patch source yet; skip directly, so it is not treated as a missing resource that aborts the build
+          # 6.12 及以上暂无上游 ZRAM 补丁源，直接跳过，避免被当成资源缺失中断构建
           case "${{ inputs.kernel_version }}" in
             6.12|6.18)
-              echo "::warning title=ZRAM skipped::Kernel ${{ inputs.kernel_version }} has no ZRAM patch source yet; ZRAM feature skipped"
+              echo "::warning title=ZRAM 已跳过::内核 ${{ inputs.kernel_version }} 暂无 ZRAM 补丁源，已跳过 ZRAM 功能"
               if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
                 echo "" >> "$GITHUB_STEP_SUMMARY"
-                echo "> ⏭️ **ZRAM / LZ4KD** skipped: kernel ${{ inputs.kernel_version }} has no ZRAM patch source yet (build not interrupted)" >> "$GITHUB_STEP_SUMMARY"
+                echo "> ⏭️ **ZRAM / LZ4KD** 已跳过：内核 ${{ inputs.kernel_version }} 暂无 ZRAM 补丁源（构建未中断）" >> "$GITHUB_STEP_SUMMARY"
               fi
               echo "ZRAM_SKIPPED=true" >> "$GITHUB_ENV"
               exit 0
               ;;
           esac
-          # Pre-check: all patch resources must exist; if any is missing, handle it per the skip-incompatible policy, to avoid failing halfway through the modifications
-          # Version patch source: SukiSU_patch/other/zram/zram_patch/<ver>
+          # 前置检查：所有补丁资源必须存在，缺失时按兼容跳过策略处理，避免修改到一半再失败
+          # 版本补丁来源：SukiSU_patch/other/zram/zram_patch/<ver>
           pick_zram_patch() {
             local name="$1"
             local path="$SUKISU_PATCHES/other/zram/zram_patch/${{ inputs.kernel_version }}/$name"
@@ -1205,24 +1281,24 @@ jobs:
           [ -n "$LZ4K_OPLUS_PATCH" ] || MISSING="$MISSING SukiSU_patch/other/zram/zram_patch/${{ inputs.kernel_version }}/lz4k_oplus.patch"
           if [ -n "$MISSING" ]; then
             if [ "$SKIP_INCOMPATIBLE" = "true" ]; then
-              echo "::warning title=ZRAM skipped::Missing ZRAM patch resources: $MISSING; ZRAM feature skipped"
+              echo "::warning title=ZRAM 已跳过::缺少 ZRAM 补丁资源:$MISSING，已跳过 ZRAM 功能"
               if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
                 echo "" >> "$GITHUB_STEP_SUMMARY"
-                echo "> ⏭️ **ZRAM / LZ4KD** skipped automatically: missing ZRAM patch resources: $MISSING (build not interrupted)" >> "$GITHUB_STEP_SUMMARY"
+                echo "> ⏭️ **ZRAM / LZ4KD** 已自动跳过：缺少 ZRAM 补丁资源:$MISSING（构建未中断）" >> "$GITHUB_STEP_SUMMARY"
               fi
               echo "ZRAM_SKIPPED=true" >> "$GITHUB_ENV"
               exit 0
             fi
-            echo "::error::Missing ZRAM patch resources: $MISSING"
+            echo "::error::缺少 ZRAM 补丁资源:$MISSING"
             exit 1
           fi
 
           zram_step_fail() {
             if [ "$SKIP_INCOMPATIBLE" = "true" ]; then
-              echo "::warning title=ZRAM skipped::$1; ZRAM feature skipped"
+              echo "::warning title=ZRAM 已跳过::$1，已跳过 ZRAM 功能"
               if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
                 echo "" >> "$GITHUB_STEP_SUMMARY"
-                echo "> ⏭️ **ZRAM / LZ4KD** skipped automatically: $1 (build not interrupted)" >> "$GITHUB_STEP_SUMMARY"
+                echo "> ⏭️ **ZRAM / LZ4KD** 已自动跳过：$1（构建未中断）" >> "$GITHUB_STEP_SUMMARY"
               fi
               echo "ZRAM_SKIPPED=true" >> "$GITHUB_ENV"
               exit 0
@@ -1231,13 +1307,13 @@ jobs:
             exit 1
           }
 
-          echo "Upgrading LZ4..."
+          echo "升级 LZ4..."
           rm -f lib/lz4/lz4_compress.c lib/lz4/lz4_decompress.c lib/lz4/lz4defs.h lib/lz4/lz4hc_compress.c
 
           cp -r $ZZH_PATCHES/zram/lz4/* ./lib/lz4/
           cp -r $ZZH_PATCHES/zram/include/linux/* ./include/linux/
           if ! bash $ZZH_PATCHES/zram/apply_lz4_neon.sh; then
-            zram_step_fail "apply_lz4_neon.sh failed"
+            zram_step_fail "apply_lz4_neon.sh 执行失败"
           fi
 
           if [ -f "fs/f2fs/Makefile" ] && ! grep -qF "f2fs-\$(CONFIG_F2FS_IOSTAT) += iostat.o" "fs/f2fs/Makefile"; then
@@ -1251,15 +1327,15 @@ jobs:
 
           cp "$LZ4KD_PATCH" ./lz4kd.patch
           if ! patch -p1 -F 3 < lz4kd.patch; then
-            echo "::warning::lz4kd.patch failed to apply; it may already be applied or the context does not match"
+            echo "::warning::lz4kd.patch 应用失败，可能已应用或上下文不匹配"
           fi
 
           cp "$LZ4K_OPLUS_PATCH" ./lz4k_oplus.patch
           if ! patch -p1 -F 3 < lz4k_oplus.patch; then
-            echo "::warning::lz4k_oplus.patch failed to apply; it may already be applied or the context does not match"
+            echo "::warning::lz4k_oplus.patch 应用失败，可能已应用或上下文不匹配"
           fi
 
-      - name: Fix 6.6 WiFi/Bluetooth compatibility (Samsung + Xiaomi)
+      - name: 修复 6.6 WiFi/蓝牙兼容性（三星 + 小米）
         if: inputs.kernel_version == '6.6'
         working-directory: ${{ env.KERNEL_ROOT }}/common
         run: |
@@ -1268,10 +1344,10 @@ jobs:
             local line="$2"
             if [ ! -f "$file" ]; then
               if [ "$SKIP_INCOMPATIBLE" != "true" ]; then
-                echo "::error::File does not exist: $file"
+                echo "::error::文件不存在: $file"
                 exit 1
               fi
-              echo "::warning title=min_kdp skipped::File does not exist: $file"
+              echo "::warning title=min_kdp 已跳过::文件不存在: $file"
               return 0
             fi
             if ! grep -qF "$line" "$file"; then
@@ -1292,24 +1368,24 @@ jobs:
 
           if [ ! -f "$MIN_KDP_PATCH" ]; then
             if [ "$SKIP_INCOMPATIBLE" != "true" ]; then
-              echo "::error::Patch does not exist: $MIN_KDP_PATCH"
+              echo "::error::补丁不存在: $MIN_KDP_PATCH"
               exit 1
             fi
-            echo "::warning title=min_kdp skipped::Patch does not exist: $MIN_KDP_PATCH"
+            echo "::warning title=min_kdp 已跳过::补丁不存在: $MIN_KDP_PATCH"
             exit 0
           fi
           if patch -p1 --dry-run < "$MIN_KDP_PATCH" >/dev/null 2>&1; then
             patch -p1 --no-backup-if-mismatch < "$MIN_KDP_PATCH"
           else
-            echo "The min_kdp symbols patch is already applied or the current context does not match; skipping."
+            echo "min_kdp symbols patch 已应用或当前上下文不匹配，跳过。"
           fi
 
           if [ ! -f "$MIN_KDP_SRC" ]; then
             if [ "$SKIP_INCOMPATIBLE" != "true" ]; then
-              echo "::error::File does not exist: $MIN_KDP_SRC"
+              echo "::error::文件不存在: $MIN_KDP_SRC"
               exit 1
             fi
-            echo "::warning title=min_kdp skipped::File does not exist: $MIN_KDP_SRC"
+            echo "::warning title=min_kdp 已跳过::文件不存在: $MIN_KDP_SRC"
             exit 0
           fi
           cp "$MIN_KDP_SRC" "$MIN_KDP_DST"
@@ -1317,7 +1393,7 @@ jobs:
 
           ensure_line_once "$XIAOMI_SYMBOL_LIST" "device_find_any_child"
 
-      - name: Configure ZRAM options
+      - name: 配置 ZRAM 选项
         if: inputs.use_zram && env.ZRAM_SKIPPED != 'true'
         run: |
           CONFIG_FILE="$DEFCONFIG"
@@ -1351,9 +1427,9 @@ jobs:
           fi
 
           if grep -q "CONFIG_ZSMALLOC=y" "$CONFIG_FILE" && grep -q "CONFIG_ZRAM=y" "$CONFIG_FILE"; then
-            # ZRAM_BACKEND_* is only declared in the 6.12+ Kconfig; the kernel_config of the bazel build
-            # validates that every config item in the fragment exists in Kconfig, and on older kernels
-            # these lines would cause a compile failure outright, so they must be stripped below 6.12
+            # ZRAM_BACKEND_* 仅在 6.12+ 的 Kconfig 中声明；bazel 构建的 kernel_config
+            # 会校验 fragment 中每个配置项都必须存在于 Kconfig，旧版本内核带上
+            # 这些行会直接导致编译失败，因此 6.12 以下需剔除
             if [ "$(printf '%s\n' "6.12" "${{ inputs.kernel_version }}" | sort -V | head -1)" = "6.12" ]; then
               cat "$ZZH_PATCHES/config/zram.config" >> "$CONFIG_FILE"
             else
@@ -1361,18 +1437,18 @@ jobs:
             fi
           fi
 
-      - name: Add BBG baseband protection patch
+      - name: 添加 BBG 基带保护补丁
         if: inputs.use_bbg
         working-directory: ${{ env.KERNEL_ROOT }}
         run: |
           bbg_fail() {
-            # Roll back a half-finished installation, so leftover references do not break the compile
+            # 回滚半成品安装，避免残留引用破坏编译
             sh /tmp/bbg_setup.sh --cleanup >/dev/null 2>&1 || true
             if [ "$SKIP_INCOMPATIBLE" = "true" ]; then
-              echo "::warning title=BBG skipped::$1; BBG baseband protection feature skipped"
+              echo "::warning title=BBG 已跳过::$1，已跳过 BBG 基带保护功能"
               if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
                 echo "" >> "$GITHUB_STEP_SUMMARY"
-                echo "> ⏭️ **BBG baseband protection** skipped automatically: $1 (build not interrupted)" >> "$GITHUB_STEP_SUMMARY"
+                echo "> ⏭️ **BBG 基带保护** 已自动跳过：$1（构建未中断）" >> "$GITHUB_STEP_SUMMARY"
               fi
               echo "BBG_SKIPPED=true" >> "$GITHUB_ENV"
               exit 0
@@ -1382,24 +1458,24 @@ jobs:
           }
 
           if ! wget -qO /tmp/bbg_setup.sh https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh; then
-            bbg_fail "Failed to download the BBG install script"
+            bbg_fail "BBG 安装脚本下载失败"
           fi
           if ! sh /tmp/bbg_setup.sh; then
-            bbg_fail "BBG install script failed"
+            bbg_fail "BBG 安装脚本执行失败"
           fi
           if [ ! -f common/security/baseband-guard/Kconfig ] || ! grep -q 'baseband-guard' common/security/Makefile; then
-            bbg_fail "BBG install result validation failed (possibly incompatible with the current kernel directory structure)"
+            bbg_fail "BBG 安装结果校验失败（可能不适配当前内核目录结构）"
           fi
 
           echo "CONFIG_BBG=y" >> common/arch/arm64/configs/gki_defconfig
           sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' common/security/Kconfig
 
-          # BBG blkdev_helper.c only includes <linux/blkdev.h>, but blkdev_get_no_open/
-          # blkdev_put_no_open were moved into the private header block/blk.h in Linux 6.9+ (two-argument
-          # form from 6.15+), causing android17-6.18 to report implicit declarations when compiling; a compatibility patch is applied based on the actual header contents
+          # BBG blkdev_helper.c 只 include <linux/blkdev.h>，但 blkdev_get_no_open/
+          # blkdev_put_no_open 在 Linux 6.9+ 已移入私有头 block/blk.h（6.15+ 为双参
+          # 形态），导致 android17-6.18 编译报隐式声明；按头文件实际内容打兼容补丁
           bash "$GITHUB_WORKSPACE/scripts/bbg_fixes/fix_blkdev_helper.sh" common
 
-      - name: Apply network enhancements (BBRv3 / IPSet / Qdisc / CIFS)
+      - name: 应用网络增强（BBRv3 / IPSet / Qdisc / CIFS）
         if: inputs.use_net_enhance
         working-directory: ${{ env.KERNEL_ROOT }}/common
         run: |
@@ -1407,10 +1483,10 @@ jobs:
 
           net_fail() {
             if [ "$SKIP_INCOMPATIBLE" = "true" ]; then
-              echo "::warning title=Network enhancements skipped::$1; network enhancement feature skipped"
+              echo "::warning title=网络增强 已跳过::$1，已跳过 网络增强功能"
               if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
                 echo "" >> "$GITHUB_STEP_SUMMARY"
-                echo "> ⏭️ **Network enhancements (BBRv3 / IPSet / Qdisc / CIFS)** skipped automatically: $1 (build not interrupted)" >> "$GITHUB_STEP_SUMMARY"
+                echo "> ⏭️ **网络增强 (BBRv3 / IPSet / Qdisc / CIFS)** 已自动跳过：$1（构建未中断）" >> "$GITHUB_STEP_SUMMARY"
               fi
               echo "NET_ENHANCE_SKIPPED=true" >> "${GITHUB_ENV:-/dev/null}"
               exit 0
@@ -1419,12 +1495,12 @@ jobs:
             exit 1
           }
 
-          echo "=== Applying network enhancements (BBRv3 / IPSet / Qdisc / CIFS) ==="
+          echo "=== 应用网络增强（BBRv3 / IPSet / Qdisc / CIFS）==="
           BBR3_DIR="$KERNEL_PATCHES/common/bbrv3"
           KVER="${{ inputs.kernel_version }}"
           AVER="${{ inputs.android_version }}"
 
-          # ---------- BBRv3 patch: dispatched by version (from WildKernels/kernel_patches) ----------
+          # ---------- BBRv3 补丁：按版本分派（来自 WildKernels/kernel_patches） ----------
           case "$AVER-$KVER" in
             android12-5.10) BBR3_PATCH="$BBR3_DIR/0001-net-tcp-backport-BBRv3-to-android12-5.10.patch" ;;
             android13-5.15) BBR3_PATCH="$BBR3_DIR/0001-net-tcp-backport-BBRv3-to-android13-5.15.patch" ;;
@@ -1433,47 +1509,47 @@ jobs:
             *) BBR3_PATCH="" ;;
           esac
 
-          # android16-6.12 has no backport patch; only baseline BBR v1 is kept
+          # android16-6.12 无 backport 补丁，仅保留基线 BBR v1
           if [ -n "$BBR3_PATCH" ]; then
-            [ -f "$BBR3_PATCH" ] || net_fail "BBRv3 patch does not exist: ${BBR3_PATCH#"$KERNEL_PATCHES"/}"
+            [ -f "$BBR3_PATCH" ] || net_fail "BBRv3 补丁不存在：${BBR3_PATCH#"$KERNEL_PATCHES"/}"
             if patch -p1 --dry-run --forward < "$BBR3_PATCH" >/dev/null 2>&1; then
               patch -p1 --no-backup-if-mismatch < "$BBR3_PATCH"
-              echo "[+] BBRv3 patch applied"
+              echo "[+] BBRv3 补丁已应用"
             elif patch -p1 --dry-run --forward -F 3 < "$BBR3_PATCH" >/dev/null 2>&1; then
-              # LTS branches keep merging upstream stable commits (such as the
-              # tcp_min_rcvbuf change in sysctl_net_ipv4.c), so the patch's context lines drift. fuzz 3 only relaxes context
-              # matching; the hunk contents must still land as-is, so this kind of offset can be absorbed safely.
+              # LTS 分支会持续合入上游 stable 提交（如 sysctl_net_ipv4.c 的
+              # tcp_min_rcvbuf），补丁的上下文行随之漂移。fuzz 3 只放宽上下文
+              # 匹配，hunk 内容仍须原样落位，可安全吸收这类偏移。
               patch -p1 --no-backup-if-mismatch -F 3 < "$BBR3_PATCH"
-              echo "[+] BBRv3 patch applied (LTS context drift, fuzz 3)"
+              echo "[+] BBRv3 补丁已应用（LTS 上下文漂移，fuzz 3）"
             elif grep -q '^config TCP_CONG_BBR3' net/ipv4/Kconfig; then
-              echo "[*] BBRv3 patch was already applied; skipping"
+              echo "[*] BBRv3 补丁此前已应用，跳过"
             else
-              net_fail "Failed to apply the BBRv3 patch (${AVER}-${KVER})"
+              net_fail "BBRv3 补丁应用失败（${AVER}-${KVER}）"
             fi
-            # Prevent continuing to compile after a fuzzy apply that missed new files/config entries
-            [ -f net/ipv4/tcp_bbr3.c ] || net_fail "net/ipv4/tcp_bbr3.c is missing after applying the BBRv3 patch"
-            grep -q '^config TCP_CONG_BBR3' net/ipv4/Kconfig || net_fail "TCP_CONG_BBR3 config entry is missing after applying the BBRv3 patch"
+            # 防止 fuzz 应用时漏掉新增文件/配置项后继续编译
+            [ -f net/ipv4/tcp_bbr3.c ] || net_fail "BBRv3 补丁应用后缺少 net/ipv4/tcp_bbr3.c"
+            grep -q '^config TCP_CONG_BBR3' net/ipv4/Kconfig || net_fail "BBRv3 补丁应用后缺少 TCP_CONG_BBR3 配置项"
           else
-            echo "[*] ${AVER}-${KVER} has no BBRv3 backport; using BBR v1"
+            echo "[*] ${AVER}-${KVER} 无 BBRv3 backport，使用 BBR v1"
           fi
 
-          # Older kernels such as 5.15.41 lack the tcp_snd_cwnd accessors (newer 5.15 has backported them),
-          # which the BBRv3 patch depends on by default; add them only when missing.
+          # 5.15.41 等旧内核缺少 tcp_snd_cwnd accessors（新 5.15 已回移），
+          # BBRv3 补丁默认依赖它们；仅在缺失时补齐。
           if [ -n "$BBR3_PATCH" ] && ! grep -q 'tcp_snd_cwnd' include/net/tcp.h; then
             python3 "$GITHUB_WORKSPACE/scripts/net_compat/add_tcp_snd_cwnd.py" \
-              || net_fail "Failed to handle the tcp_snd_cwnd compatibility for the old kernel"
+              || net_fail "旧内核 tcp_snd_cwnd 兼容处理失败"
           fi
 
-          # 5.10 lacks proc_dou8vec_minmax (a 5.15+ sysctl API that BBRv3 depends on); add two prerequisite patches
+          # 5.10 缺少 proc_dou8vec_minmax（BBRv3 依赖的 5.15+ sysctl API），补两个前置补丁
           if [ "$KVER" = "5.10" ] && ! grep -qF 'int proc_dou8vec_minmax(' include/linux/sysctl.h 2>/dev/null; then
             for prepatch in sysctl_add_proc_dou8vec_minmax sysctl_fix_data-races_in_proc_dou8vec_minmax; do
               if patch -p1 --dry-run < "$BBR3_DIR/$prepatch.patch" >/dev/null 2>&1; then
                 patch -p1 --no-backup-if-mismatch < "$BBR3_DIR/$prepatch.patch"
               else
-                net_fail "Failed to apply the 5.10 sysctl prerequisite patch: $prepatch"
+                net_fail "5.10 sysctl 前置补丁应用失败：$prepatch"
               fi
             done
-            echo "[+] 5.10 sysctl prerequisite patches applied"
+            echo "[+] 5.10 sysctl 前置补丁已应用"
           fi
 
           set_config() {
@@ -1487,7 +1563,7 @@ jobs:
             fi
           }
 
-          # Full IPSet suite + netfilter integration (Kconfig verified to exist in every version)
+          # IPSet 全家桶 + netfilter 联动（各版本 Kconfig 均已验证存在）
           for cfg in IP_SET IP_SET_BITMAP_IP IP_SET_BITMAP_IPMAC IP_SET_BITMAP_PORT \
             IP_SET_HASH_IP IP_SET_HASH_IPMARK IP_SET_HASH_IPPORT IP_SET_HASH_IPPORTIP \
             IP_SET_HASH_IPPORTNET IP_SET_HASH_IPMAC IP_SET_HASH_MAC \
@@ -1499,7 +1575,7 @@ jobs:
           done
           set_config CONFIG_IP_SET_MAX 65534
 
-          # TCP congestion control algorithm: versions with the BBRv3 patch default to bbr3, the rest default to bbr
+          # TCP 拥塞控制算法：已打 BBRv3 补丁的版本默认 bbr3，其余默认 bbr
           for cfg in TCP_CONG_ADVANCED TCP_CONG_BBR TCP_CONG_CUBIC \
             TCP_CONG_BIC TCP_CONG_WESTWOOD TCP_CONG_HTCP; do
             set_config "CONFIG_$cfg" y
@@ -1513,23 +1589,23 @@ jobs:
             set_config CONFIG_DEFAULT_TCP_CONG '"bbr"'
           fi
 
-          # Traffic-shaping Qdisc + connection marking + TTL/HopLimit + WireGuard
+          # 流量整形 Qdisc + 连接标记 + TTL/HopLimit + WireGuard
           for cfg in NET_SCH_FQ NET_SCH_FQ_CODEL NET_SCH_CAKE NET_ACT_CONNMARK \
             IP_NF_TARGET_TTL IP6_NF_TARGET_HL IP6_NF_MATCH_HL WIREGUARD; do
             set_config "CONFIG_$cfg" y
           done
 
-          # CIFS network filesystem (NETFS_SUPPORT is a hidden symbol, selected by Kconfig as needed)
+          # CIFS 网络文件系统（NETFS_SUPPORT 为隐藏符号，由 Kconfig 按需选中）
           for cfg in CIFS NETWORK_FILESYSTEMS KEYS CIFS_XATTR CIFS_POSIX; do
             set_config "CONFIG_$cfg" y
           done
 
-          # CIFS=y also promotes the NETFS_SUPPORT / CRYPTO_LIB_ARC4 that its Kconfig selects
-          # to built-in, while the GKI module list still expects the corresponding .ko, so the dist-stage artifact validation would fail; the
-          # corresponding entries must be deleted. The list location varies by version: 6.12 and earlier use the root modules.bzl, from 6.18
-          # it moved to bazel/modules_private.bzl (the root modules.bzl is only a forwarding shim).
-          # libarc4 only needs handling in versions where the CIFS Kconfig declares the select (6.18+); earlier versions
-          # keep it as a module via CONFIG_PPP_MPPE=m, and deleting it would break its dependency instead.
+          # CIFS=y 会把其 Kconfig select 的 NETFS_SUPPORT / CRYPTO_LIB_ARC4 一并提升
+          # 为内建，而 GKI 模块清单仍期待对应 .ko，dist 阶段产物校验将失败，需删除
+          # 对应条目。清单位置随版本变化：6.12 及更早版本在根 modules.bzl，6.18 起
+          # 迁移到 bazel/modules_private.bzl（根 modules.bzl 仅为转发 shim）。
+          # libarc4 仅在 CIFS Kconfig 声明 select 的版本（6.18+）需要处理，更早版本
+          # 由 CONFIG_PPP_MPPE=m 维持为模块，删除反而破坏其依赖。
           if grep -q '^CONFIG_CIFS=y$' "$DEFCONFIG"; then
             for MODULE_LIST in modules.bzl bazel/modules_private.bzl; do
               [ -f "$MODULE_LIST" ] || continue
@@ -1540,19 +1616,19 @@ jobs:
             done
           fi
 
-          # Post-write validation: key symbols must be persisted
-          grep -q '^CONFIG_IP_SET=y$' "$DEFCONFIG" || net_fail "IPSet config write validation failed"
-          grep -q '^CONFIG_IP_SET_MAX=65534$' "$DEFCONFIG" || net_fail "IPSet maximum set count config write validation failed"
-          grep -q '^CONFIG_NET_SCH_FQ=y$' "$DEFCONFIG" || net_fail "FQ qdisc config write validation failed"
-          grep -q '^CONFIG_CIFS=y$' "$DEFCONFIG" || net_fail "CIFS config write validation failed"
+          # 写后校验：关键符号必须落盘
+          grep -q '^CONFIG_IP_SET=y$' "$DEFCONFIG" || net_fail "IPSet 配置写入校验失败"
+          grep -q '^CONFIG_IP_SET_MAX=65534$' "$DEFCONFIG" || net_fail "IPSet 集合数上限配置写入校验失败"
+          grep -q '^CONFIG_NET_SCH_FQ=y$' "$DEFCONFIG" || net_fail "FQ qdisc 配置写入校验失败"
+          grep -q '^CONFIG_CIFS=y$' "$DEFCONFIG" || net_fail "CIFS 配置写入校验失败"
           if [ -n "$BBR3_PATCH" ]; then
-            grep -q '^CONFIG_DEFAULT_TCP_CONG="bbr3"$' "$DEFCONFIG" || net_fail "BBRv3 default congestion control config write validation failed"
+            grep -q '^CONFIG_DEFAULT_TCP_CONG="bbr3"$' "$DEFCONFIG" || net_fail "BBRv3 默认拥塞控制配置写入校验失败"
           else
-            grep -q '^CONFIG_DEFAULT_TCP_CONG="bbr"$' "$DEFCONFIG" || net_fail "BBR default congestion control config write validation failed"
+            grep -q '^CONFIG_DEFAULT_TCP_CONG="bbr"$' "$DEFCONFIG" || net_fail "BBR 默认拥塞控制配置写入校验失败"
           fi
-          echo "[+] Network enhancement configuration complete"
+          echo "[+] 网络增强配置完成"
 
-      - name: Apply Re-Kernel
+      - name: 应用 Re-Kernel
         if: inputs.use_rekernel
         working-directory: ${{ env.KERNEL_ROOT }}
         run: |
@@ -1562,19 +1638,19 @@ jobs:
             rm -rf "$TMP_REKERNEL"
             git clone --depth 1 https://github.com/Sakion-Team/Re-Kernel.git "$TMP_REKERNEL"
 
-            # Sync the complete driver sources after the upstream split
+            # 同步上游拆分后的完整驱动源码
             rm -rf common/drivers/rekernel
             mkdir -p common/drivers/rekernel
             cp -a "$TMP_REKERNEL/LKM-Source/." common/drivers/rekernel/
 
-            # Adapt the upstream out-of-tree module config into a kernel built-in driver
+            # 将上游外置模块配置适配为内核内置驱动
             REKERNEL_MAKEFILE="common/drivers/rekernel/Makefile"
             sed -i 's/^obj-m := rekernel\.o$/obj-$(CONFIG_REKERNEL) += rekernel.o/' "$REKERNEL_MAKEFILE"
             grep -qF 'ccflags-$(CONFIG_REKERNEL_LEGACY_NETLINK) += -DLEGACY_NETLINK' "$REKERNEL_MAKEFILE" || \
               echo 'ccflags-$(CONFIG_REKERNEL_LEGACY_NETLINK) += -DLEGACY_NETLINK' >> "$REKERNEL_MAKEFILE"
             sed -i '/^[[:space:]]*depends on MODULES[[:space:]]*$/d' common/drivers/rekernel/Kconfig
 
-            # Mount into the driver tree
+            # 挂载到驱动树
             if ! grep -qF 'source "drivers/rekernel/Kconfig"' common/drivers/Kconfig; then
               sed -i '/^endmenu$/i source "drivers/rekernel/Kconfig"' common/drivers/Kconfig
             fi
@@ -1582,38 +1658,38 @@ jobs:
               echo 'obj-$(CONFIG_REKERNEL) += rekernel/' >> common/drivers/Makefile
             fi
 
-            # Fix header include paths (to suit in-tree compilation)
+            # 修正头文件包含路径（适配 in-tree 编译）
             sed -i 's|#include <../android/binder_internal.h>|#include "../android/binder_internal.h"|g' common/drivers/rekernel/rekernel_binder.c
-            # Add the definitions that 5.10 binder_internal.h needs to use DEFINE_SHOW_ATTRIBUTE
+            # 补齐 5.10 binder_internal.h 使用 DEFINE_SHOW_ATTRIBUTE 所需的定义
             grep -qF '#include <linux/seq_file.h>' common/drivers/rekernel/rekernel_binder.c || \
               sed -i '/#include <linux\/kprobes.h>/a #include <linux/seq_file.h>' common/drivers/rekernel/rekernel_binder.c
 
-            # Configure defconfig (idempotent)
+            # 配置 defconfig（幂等）
             grep -q '^CONFIG_REKERNEL=y$' "$DEFCONFIG" || echo "CONFIG_REKERNEL=y" >> "$DEFCONFIG"
             grep -q '^CONFIG_REKERNEL_NETWORK=y$' "$DEFCONFIG" || echo "CONFIG_REKERNEL_NETWORK=y" >> "$DEFCONFIG"
           ); then
             exit 0
           fi
 
-          # Integration failed: roll back the half-finished state, so leftover references do not break the compile
+          # 集成失败：回滚半成品状态，避免残留引用破坏编译
           rm -rf common/drivers/rekernel
           sed -i '\|source "drivers/rekernel/Kconfig"|d' common/drivers/Kconfig 2>/dev/null || true
           sed -i '\|obj-$(CONFIG_REKERNEL) += rekernel/|d' common/drivers/Makefile 2>/dev/null || true
           sed -i '/^CONFIG_REKERNEL=y$/d; /^CONFIG_REKERNEL_NETWORK=y$/d' "$DEFCONFIG" 2>/dev/null || true
 
           if [ "$SKIP_INCOMPATIBLE" = "true" ]; then
-            echo "::warning title=Re-Kernel skipped::Re-Kernel integration failed (repository unavailable or sources do not fit the current kernel); rolled back and feature skipped"
+            echo "::warning title=Re-Kernel 已跳过::Re-Kernel 集成失败（仓库不可用或源码不适配当前内核），已回滚并跳过该功能"
             if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
               echo "" >> "$GITHUB_STEP_SUMMARY"
-              echo "> ⏭️ **Re-Kernel** skipped automatically: integration failed (repository unavailable or sources do not fit the current kernel), rolled back (build not interrupted)" >> "$GITHUB_STEP_SUMMARY"
+              echo "> ⏭️ **Re-Kernel** 已自动跳过：集成失败（仓库不可用或源码不适配当前内核），已回滚（构建未中断）" >> "$GITHUB_STEP_SUMMARY"
             fi
             echo "REKERNEL_SKIPPED=true" >> "$GITHUB_ENV"
             exit 0
           fi
-          echo "::error::Re-Kernel integration failed"
+          echo "::error::Re-Kernel 集成失败"
           exit 1
 
-      - name: Configure kernel options
+      - name: 配置内核选项
         working-directory: ${{ env.KERNEL_ROOT }}
         run: |
           cat >> "$DEFCONFIG" << 'EOF'
@@ -1622,77 +1698,78 @@ jobs:
           CONFIG_TMPFS_POSIX_ACL=y
           EOF
 
-          # Whenever the 6.18 modpost is given -u (the TRIM_UNUSED_KSYMS allowlist), it records every exported symbol
-          # as "protected" by default (KSYM_FLAG_PROTECTED is written into __kflagstab); under
-          # #ifdef CONFIG_MODULE_SIG the kernel refuses unsigned modules that reference these symbols, returning -EACCES.
-          # The kernel in this repository is signed with a key generated at build time, while modules in the official system_dlkm (signed with
-          # Google's key) always get sig_ok=false, so modules such as 8021q, usbnet and the bluetooth transport layer
-          # are all refused to load, resulting in WiFi, Bluetooth and mobile data all being down.
-          # Removing this default marker is enough (the -u allowlist trimming behavior is unchanged).
-          MODPOST_C="common/scripts/mod/modpost.c"
-          if [ -f "$MODPOST_C" ] && grep -q 'default_symbol_protected_status = true;' "$MODPOST_C"; then
-            sed -i '/default_symbol_protected_status = true;/d' "$MODPOST_C"
-            echo "modpost: removed the default protected marker from exported symbols (6.18 -EACCES fix)"
+          # 6.18 的厂商内核把 RFKILL / BT 核心直接编进 Image，system_dlkm 不再提供
+          # rfkill.ko / bluetooth.ko；本仓库只刷 Image，若沿用 AOSP gki_defconfig 的
+          # =m，厂商 cfg80211 / btmtk 模块会因缺少 rfkill_* / hci_* 符号而加载失败，
+          # 表现为 WiFi、蓝牙消失。改为内建，并从 GKI 模块清单移除对应 .ko 条目。
+          if [ "${{ inputs.kernel_version }}" = "6.18" ]; then
+            sed -i 's/^CONFIG_RFKILL=m$/CONFIG_RFKILL=y/; s/^CONFIG_BT=m$/CONFIG_BT=y/' "$DEFCONFIG"
+            grep -q '^CONFIG_RFKILL=y$' "$DEFCONFIG" || echo "CONFIG_RFKILL=y" >> "$DEFCONFIG"
+            grep -q '^CONFIG_BT=y$' "$DEFCONFIG" || echo "CONFIG_BT=y" >> "$DEFCONFIG"
+            for MODULE_LIST in common/modules.bzl common/bazel/modules.bzl common/bazel/modules_private.bzl; do
+              [ -f "$MODULE_LIST" ] || continue
+              sed -i '/"net\/rfkill\/rfkill\.ko",/d; /"net\/bluetooth\/bluetooth\.ko",/d' "$MODULE_LIST"
+            done
           fi
 
-          # With KSU disabled there is no KernelSU in the source, and CONFIG_KSU would be rejected by the bazel defconfig validation
-          if [ "${{ inputs.ksu_mode }}" != "Disable KSU" ]; then
+          # 禁用 KSU 时源码里没有 KernelSU，CONFIG_KSU 会被 bazel defconfig 校验拒绝
+          if [ "${{ inputs.ksu_mode }}" != "禁用KSU" ]; then
             echo "CONFIG_KSU=y" >> "$DEFCONFIG"
           fi
 
-          # The SukiSU-Nova main branch sets the Kconfig default of KSU_SUSFS to y; when SUSFS is not integrated
-          # (android17-6.18 has no SUSFS branch, or SUSFS was disabled, or SUSFS was skipped automatically)
-          # it must be turned off explicitly, otherwise kernel_includes.h would reference the non-existent <linux/susfs.h>
-          # and cause a compile failure. Write it only when the KernelSU source actually declares this option, to avoid fragment validation failures.
-          if [ "${{ inputs.ksu_variant }}" = "SukiSU-Nova" ] && [ "${{ inputs.ksu_mode }}" != "Disable KSU" ] \
+          # SukiSU main 分支把 KSU_SUSFS 的 Kconfig 默认值设为 y；未集成 SUSFS
+          # （android17-6.18 没有 SUSFS 分支，或选择了禁用 SUSFS、SUSFS 自动跳过）
+          # 时必须显式关闭，否则 kernel_includes.h 会引用不存在的 <linux/susfs.h>
+          # 导致编译失败。仅在 KernelSU 源码确实声明该选项时写入，避免 fragment 校验失败。
+          if [ "${{ inputs.ksu_variant }}" = "SukiSU" ] && [ "${{ inputs.ksu_mode }}" != "禁用KSU" ] \
             && { [ "${{ inputs.enable_susfs }}" != "true" ] || [ "$SUSFS_SKIPPED" = "true" ]; }; then
             if grep -qsE '^[[:space:]]*config[[:space:]]+KSU_SUSFS([[:space:]]|$)' KernelSU/kernel/Kconfig; then
               echo "# CONFIG_KSU_SUSFS is not set" >> "$DEFCONFIG"
             fi
           fi
 
-          # After the BakaSU upstream rename, the Kconfig default dropped @%REPO_NAME%; add the template back explicitly,
-          # and together with ksu_post_setup.sh rewriting REPO_NAME := LingLuo, the manager can display the @LingLuo suffix
-          if [ "${{ inputs.ksu_variant }}" == "BakaSU" ] && [ "${{ inputs.ksu_mode }}" != "Disable KSU" ]; then
+          # BakaSU 上游改名后 Kconfig 默认值去掉了 @%REPO_NAME%，显式加回模板，
+          # 配合 ksu_post_setup.sh 的 REPO_NAME := LingLuo 改写，管理器才能显示 @LingLuo 后缀
+          if [ "${{ inputs.ksu_variant }}" == "BakaSU" ] && [ "${{ inputs.ksu_mode }}" != "禁用KSU" ]; then
             echo 'CONFIG_KSU_FULL_NAME_FORMAT="%TAG_NAME%-%COMMIT_SHA%@%REPO_NAME%"' >> "$DEFCONFIG"
           fi
 
-          if [ "${{ inputs.ksu_variant }}" == "SukiSU-Nova" ] || [ "${{ inputs.ksu_variant }}" == "BakaSU" ]; then
+          if [ "${{ inputs.ksu_variant }}" == "SukiSU" ] || [ "${{ inputs.ksu_variant }}" == "BakaSU" ]; then
             if [ "${{ inputs.use_kpm }}" == "true" ]; then
               if grep -RqsE '^[[:space:]]*config[[:space:]]+KPM([[:space:]]|$)' common KernelSU 2>/dev/null; then
                 echo "CONFIG_KPM=y" >> "$DEFCONFIG"
               elif [ "$SKIP_INCOMPATIBLE" = "true" ]; then
-                echo "::warning title=KPM skipped::The current KernelSU code does not declare CONFIG_KPM; KPM feature skipped"
+                echo "::warning title=KPM 已跳过::当前 KernelSU 代码未声明 CONFIG_KPM，已跳过 KPM 功能"
                 if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
                   echo "" >> "$GITHUB_STEP_SUMMARY"
-                  echo "> ⏭️ **KPM** skipped automatically: the current KernelSU code does not declare CONFIG_KPM (build not interrupted)" >> "$GITHUB_STEP_SUMMARY"
+                  echo "> ⏭️ **KPM** 已自动跳过：当前 KernelSU 代码未声明 CONFIG_KPM（构建未中断）" >> "$GITHUB_STEP_SUMMARY"
                 fi
               else
-                echo "Error: KPM was requested, but the current KernelSU code does not declare CONFIG_KPM" >&2
+                echo "错误: 已请求启用 KPM，但当前 KernelSU 代码未声明 CONFIG_KPM" >&2
                 exit 1
               fi
             fi
           elif [ "${{ inputs.ksu_variant }}" == "FinaSU" ]; then
             if [ "${{ inputs.use_kpm }}" == "true" ]; then
-              echo "::warning title=KPM not applicable::FinaSU does not support KPM; the option is ignored and the build continues"
+              echo "::warning title=KPM 不适用::FinaSU 不支持 KPM，已忽略该选项继续构建"
               if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
                 echo "" >> "$GITHUB_STEP_SUMMARY"
-                echo "> ⏭️ **KPM** ignored: the FinaSU variant does not support KPM (build not interrupted)" >> "$GITHUB_STEP_SUMMARY"
+                echo "> ⏭️ **KPM** 已忽略：FinaSU 变体不支持 KPM（构建未中断）" >> "$GITHUB_STEP_SUMMARY"
               fi
             fi
           fi
 
-          # FinaSU + SUSFS: select the SUSFS Inline hook backend; the matching 50_add patch
-          # provides direct ksu_handle_* call sites, which the FinaSU Kbuild validates at compile time.
-          # If the current kernel/patch lacks hook points, fall back to Tracepoint to avoid a compile failure.
+          # FinaSU + SUSFS：选择 SUSFS Inline hook 后端；匹配的 50_add 补丁
+          # 提供直接 ksu_handle_* 调用点，FinaSU Kbuild 会在编译期校验。
+          # 若当前内核/补丁缺少 hook 点，回退 Tracepoint，避免编译失败。
           if [ "${{ inputs.ksu_variant }}" == "FinaSU" ] && [ "${{ inputs.enable_susfs }}" == "true" ]; then
             chmod +x KernelSU/kernel/tools/check_susfs_inline.sh 2>/dev/null || true
             if grep -q '^config KSU_HOOK_SUSFS_INLINE' KernelSU/kernel/Kconfig 2>/dev/null \
               && bash KernelSU/kernel/tools/check_susfs_inline.sh common >/dev/null 2>&1; then
               echo "CONFIG_KSU_HOOK_SUSFS_INLINE=y" >> "$DEFCONFIG"
-              echo "FinaSU: SUSFS Inline hook backend selected"
+              echo "FinaSU: 已选择 SUSFS Inline hook 后端"
             else
-              echo "::warning title=SUSFS Inline fallback::The current kernel lacks inline hook call sites; falling back to the Tracepoint backend"
+              echo "::warning title=SUSFS Inline 回退::当前内核缺少内联 hook 调用点，回退到 Tracepoint 后端"
             fi
           fi
 
@@ -1702,50 +1779,49 @@ jobs:
           fi
           if [[ "${{ inputs.ksu_variant }}" == "BakaSU" && "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" && "$CURRENT_SUB" -ge 74 && "$CURRENT_SUB" -le 137 ]]; then
             echo "CONFIG_KALLSYMS=y" >> "$DEFCONFIG"
-            # Fix 5.15.74~5.15.137: kallsyms_on_each_symbol is only compiled under LIVEPATCH, which makes the BakaSU link fail
+            # 修复 5.15.74~5.15.137: kallsyms_on_each_symbol 仅在 LIVEPATCH 下编译，导致 BakaSU 链接失败
             KALLSYMS_C="./common/kernel/kallsyms.c"
             if [ -f "$KALLSYMS_C" ] \
               && grep -qF 'int kallsyms_on_each_symbol' "$KALLSYMS_C" \
               && grep -qF '#endif /* CONFIG_LIVEPATCH */' "$KALLSYMS_C"; then
               sed -i '/^#ifdef CONFIG_LIVEPATCH$/,/^int kallsyms_on_each_symbol/ { /^#ifdef CONFIG_LIVEPATCH$/d }' "$KALLSYMS_C"
               sed -i '/^int kallsyms_on_each_symbol/,/^#endif \/\* CONFIG_LIVEPATCH \*\// { /^#endif \/\* CONFIG_LIVEPATCH \*\//d }' "$KALLSYMS_C"
-              echo "Fixed the LIVEPATCH compile restriction of kallsyms_on_each_symbol"
+              echo "已修复 kallsyms_on_each_symbol 的 LIVEPATCH 编译限制"
             fi
           fi
 
           sed -i 's/check_defconfig//' ./common/build.config.gki
 
-      - name: Add SUSFS config
+      - name: 添加 SUSFS 配置
         if: inputs.enable_susfs && env.SUSFS_SKIPPED != 'true'
+        working-directory: ${{ env.KERNEL_ROOT }}
         run: |
-          cat >> "$DEFCONFIG" << 'EOF'
-          CONFIG_KSU_SUSFS=y
-          CONFIG_KSU_SUSFS_SUS_PATH=y
-          CONFIG_KSU_SUSFS_SUS_MOUNT=y
-          CONFIG_KSU_SUSFS_SUS_KSTAT=y
-          CONFIG_KSU_SUSFS_SPOOF_UNAME=y
-          CONFIG_KSU_SUSFS_ENABLE_LOG=y
-          CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
-          CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
-          CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
-          CONFIG_KSU_SUSFS_SUS_MAP=y
-          EOF
+          # 按 feat/usb-arsenal 方式：先写入 wild_defconfig.fragment（供兼容参考构建消费）；
+          # 同时写入 $DEFCONFIG，使本备份的 diff→ksu.fragment 流程能将其传给 bazel。
+          python3 "${{ env.KERNEL_ROOT }}/../scripts/append_fragment.py" \
+            "${{ env.KERNEL_ROOT }}/../.github/fragments/enable-susfs-kernel-configs.fragment" \
+            --dest common/wild_defconfig.fragment --label enable-susfs-kernel-configs
 
-      - name: Configure kernel name
+          # 追加到 gki_defconfig，供后续 diff 生成 ksu.fragment 并传入 bazel --defconfig_fragment
+          while IFS= read -r line; do
+            case "$line" in
+              ''|\#*) continue ;;
+            esac
+            if ! grep -qF "$line" "$DEFCONFIG"; then
+              echo "$line" >> "$DEFCONFIG"
+            fi
+          done < "${{ env.KERNEL_ROOT }}/../.github/fragments/enable-susfs-kernel-configs.fragment"
+
+      - name: 配置内核名称
         working-directory: ${{ env.KERNEL_ROOT }}
         run: |
           if [ -f "build/build.sh" ]; then
             sed -i 's/-dirty//' ./common/scripts/setlocalversion
           else
             sed -i '/^[[:space:]]*"protected_exports_list"[[:space:]]*:[[:space:]]*"android\/abi_gki_protected_exports_aarch64",$/d' ./common/BUILD.bazel
-            # 6.12/6.18 use protected_module_names_list to generate the "protected symbol exports" list. The kernel in this repository
-            # is signed with a key generated at build time, and modules in the official system_dlkm (signed with Google's key) are treated as
-            # unsigned modules; when exporting protected symbols such as rfkill_*/hci_* they are refused to load outright (exports
-            # protected symbol), causing WiFi/Bluetooth to disappear. Removing this attribute turns off the export-side check.
-            sed -i '/^[[:space:]]*protected_module_names_list[[:space:]]*=[[:space:]]*":gki_[a-z0-9_]*_protected_module_names",$/d' ./common/BUILD.bazel
-            # kmi_symbol_list_strict_mode is a multi-line select({...}) in android17-6.18,
-            # and deleting only the first line with a whole-line sed would leave a broken dictionary and cause a BUILD.bazel syntax error,
-            # so a script is used to remove it completely in all three forms: attribute / dictionary entry / select block
+            # kmi_symbol_list_strict_mode 在 android17-6.18 是多行 select({...})，
+            # 整行 sed 只删首行会留下残缺字典导致 BUILD.bazel 语法错误，
+            # 改用脚本按属性/字典条目/select 块三种形态完整移除
             python3 "$GITHUB_WORKSPACE/scripts/kleaf_fixes/strip_kmi_strict_mode.py" ./common/BUILD.bazel
             rm -rf ./common/android/abi_gki_protected_exports_*
             sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
@@ -1778,7 +1854,7 @@ jobs:
             fi
           fi
 
-      - name: Set custom build time
+      - name: 设置自定义构建时间
         shell: bash
         env:
           INPUT_TIME: ${{ inputs.build_time }}
@@ -1786,27 +1862,27 @@ jobs:
           set -euo pipefail
 
           if [[ -n "$INPUT_TIME" && "$INPUT_TIME" != "N" && "$INPUT_TIME" != "n" ]]; then
-            # Strip leading/trailing whitespace and collapse consecutive spaces into single-space separators (handles all three forms: Dec 03 / Dec 3 / Dec  3)
+            # 去除首尾空白并压缩连续空格，统一为单空格分隔（兼容 Dec 03 / Dec 3 / Dec  3 三种写法）
             INPUT_TIME="$(printf '%s' "$INPUT_TIME" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/[[:space:]][[:space:]]*/ /g')"
 
             TIME_REGEX='^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) ( ?[1-9]|0[1-9]|[12][0-9]|3[01]) ([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9] UTC [0-9]{4}$'
             if [[ ! "$INPUT_TIME" =~ $TIME_REGEX ]]; then
-              echo "::error title=Invalid build time format::The custom build time must look like Tue Dec  1 08:10:00 UTC 2026; remove any extra prefix and use a two-digit date."
+              echo "::error title=构建时间格式错误::自定义构建时间必须形如 Tue Dec  1 08:10:00 UTC 2026，请删除多余前缀并使用两位日期。"
               exit 1
             fi
 
-            # Parse into a standard UTC time (can reject non-existent dates, such as February 30)
+            # 解析为标准 UTC 时间（可拒绝不存在的日期，如 2 月 30 日）
             NORMALIZED_TIME="$(LC_ALL=C TZ=UTC date -u -d "$INPUT_TIME" +'%a %b %e %T UTC %Y' 2>/dev/null || true)"
             if [[ -z "$NORMALIZED_TIME" ]]; then
-              echo "::error title=Invalid build time::The custom build time cannot be parsed as a real UTC time."
+              echo "::error title=构建时间无效::自定义构建时间无法解析为真实 UTC 时间。"
               exit 1
             fi
 
-            # GNU date ignores the weekday field in its input, so remove the weekday, parse out the real weekday separately, and then compare
+            # GNU date 会忽略输入中的星期字段，因此去掉星期后单独解析出真实星期再比对
             TYPED_WD="${INPUT_TIME%% *}"
             REAL_WD="$(LC_ALL=C TZ=UTC date -u -d "${INPUT_TIME#* }" +%a 2>/dev/null || true)"
             if [[ -z "$REAL_WD" || "$TYPED_WD" != "$REAL_WD" ]]; then
-              echo "::error title=Weekday and date mismatch::The weekday entered does not match the date; it should actually be ${REAL_WD:-Unknown} (reference: $NORMALIZED_TIME)."
+              echo "::error title=星期与日期不匹配::输入的星期与日期不一致，实际应为 ${REAL_WD:-未知}（参考：$NORMALIZED_TIME）。"
               exit 1
             fi
 
@@ -1815,18 +1891,18 @@ jobs:
             DATESTR="$(TZ='CST-8' date +'%a %b %d %T UTC %Y')"
           fi
 
-          echo "Using build time: $DATESTR"
+          echo "使用构建时间: $DATESTR"
           echo "KBUILD_BUILD_TIMESTAMP=$DATESTR" >> "$GITHUB_ENV"
           echo "KBUILD_BUILD_VERSION=1" >> "$GITHUB_ENV"
 
-          # Unified handling of the mkcompile_h patch
+          # 统一处理 mkcompile_h 补丁
           f="$KERNEL_ROOT/common/scripts/mkcompile_h"
           if [ -f "$f" ]; then
             if [[ "${{ inputs.kernel_version }}" == "5.10" || "${{ inputs.kernel_version }}" == "5.15" ]]; then
-              echo "Applying 5.x classic timestamp patch: $f"
+              echo "应用 5.x 经典时间戳补丁: $f"
               perl -pi -e "s{UTS_VERSION=\"\\\$\(echo \\\$UTS_VERSION \\\$CONFIG_FLAGS \\\$TIMESTAMP \\| cut -b -\\\$UTS_LEN\)\"}{UTS_VERSION=\"#1 SMP PREEMPT $DATESTR\"}" "$f"
             else
-              echo "Applying 6.x mkcompile_h patch: $f"
+              echo "应用 6.x mkcompile_h 补丁: $f"
               if grep -q 'UTS_VERSION=' "$f"; then
                 perl -pi -e "s{UTS_VERSION=\"\\\$\\\(.*?\\\)\"}{UTS_VERSION=\"#1 SMP PREEMPT $DATESTR\"}" "$f"
               else
@@ -1835,7 +1911,7 @@ jobs:
             fi
           fi
           
-      - name: Compile kernel
+      - name: 编译内核
         id: compile_kernel
         uses: nick-fields/retry@v4
         with:
@@ -1848,7 +1924,7 @@ jobs:
             ATTEMPT_FILE="$LOG_DIR/.compile-attempt"
             mkdir -p "$LOG_DIR"
 
-            # Generate a separate log for each retry execution
+            # 为 retry 的每次执行生成独立日志
             ATTEMPT=1
             if [ -s "$ATTEMPT_FILE" ]; then
               read -r LAST_ATTEMPT < "$ATTEMPT_FILE"
@@ -1861,10 +1937,10 @@ jobs:
 
             set -o pipefail
             {
-              echo "Compile attempt: $ATTEMPT"
-              echo "Start time: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-              echo "Current KSU latest commit date: ${KSU_LATEST_COMMIT_DATE}"
-              echo "Current SUSFS latest commit date: ${SUSFS_LATEST_COMMIT_DATE}"
+              echo "编译尝试: $ATTEMPT"
+              echo "开始时间: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+              echo "当前 KSU 最新提交日期: ${KSU_LATEST_COMMIT_DATE}"
+              echo "当前 SUSFS 最新提交日期: ${SUSFS_LATEST_COMMIT_DATE}"
               set -ex
               cd "$KERNEL_ROOT"
 
@@ -1876,11 +1952,11 @@ jobs:
                 LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="/usr/bin/ccache clang" || exit 1
                 strings "out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image" | grep 'Linux version'
               else
-                # Extract the gki_defconfig changes into a fragment, to avoid bazel trim check failures
+                # 提取 gki_defconfig 修改到 fragment，避免 bazel trim 检查失败
                 FRAG="common/arch/arm64/configs/ksu.fragment"
                 diff "$DEFCONFIG.orig" "$DEFCONFIG" | grep '^>' | sed 's/^> //; s/^[[:space:]]*//' > "$FRAG" || true
                 cp "$DEFCONFIG.orig" "$DEFCONFIG"
-                echo "=== KSU Fragment contents ==="
+                echo "=== KSU Fragment 内容 ==="
                 cat "$FRAG"
                 echo "========================="
                 FRAG_FLAG=""
@@ -1888,7 +1964,7 @@ jobs:
                   FRAG_FLAG="--defconfig_fragment=//common:arch/arm64/configs/ksu.fragment"
                 fi
                 LTO_FLAG="--lto=thin"
-                # 6.12 and newer GKI are fixed to none under bazel
+                # 6.12 及更新的 GKI 在 bazel 下固定 none
                 KVER_NUM="${{ inputs.kernel_version }}"
                 if [ "$(printf '%s\n' "6.12" "$KVER_NUM" | sort -V | head -1)" = "6.12" ]; then
                   LTO_FLAG="--lto=none"
@@ -1897,19 +1973,19 @@ jobs:
                 strings ./bazel-bin/common/kernel_aarch64/Image | grep 'Linux version'
               fi
 
-              echo "Current KSU latest commit date: ${KSU_LATEST_COMMIT_DATE}"
-              echo "Current SUSFS latest commit date: ${SUSFS_LATEST_COMMIT_DATE}"
-              echo "If the dates differ or are too far apart, the patch becomes invalid and the compile fails"
+              echo "当前 KSU 最新提交日期: ${KSU_LATEST_COMMIT_DATE}"
+              echo "当前 SUSFS 最新提交日期: ${SUSFS_LATEST_COMMIT_DATE}"
+              echo "如果日期不同或相差过远则补丁失效、编译失败"
             } 2>&1 | tee "$LOG_FILE"
 
             BUILD_STATUS=${PIPESTATUS[0]}
             {
-              echo "End time: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-              echo "Exit code: $BUILD_STATUS"
+              echo "结束时间: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+              echo "退出码: $BUILD_STATUS"
             } >> "$LOG_FILE"
             exit "$BUILD_STATUS"
 
-      - name: Collect compile failure logs
+      - name: 整理编译失败日志
         if: ${{ always() && steps.compile_kernel.outcome == 'failure' }}
         env:
           COMPILE_ATTEMPTS: ${{ steps.compile_kernel.outputs.total_attempts }}
@@ -1919,17 +1995,17 @@ jobs:
           mkdir -p "$LOG_DIR"
 
           {
-            echo "Android version: ${{ inputs.android_version }}"
-            echo "Kernel version: ${{ inputs.kernel_version }}.${{ inputs.sub_level }}"
-            echo "Security patch level: ${{ inputs.os_patch_level }}"
-            echo "KernelSU variant: ${{ inputs.ksu_variant }}"
-            echo "Config name: ${CONFIG:-Unknown}"
-            echo "Git commit: $GITHUB_SHA"
-            echo "Workflow URL: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-            echo "Compile attempts: ${COMPILE_ATTEMPTS:-Unknown}"
-            echo "Final exit code: ${COMPILE_EXIT_CODE:-Unknown}"
-            echo "KSU commit date: ${KSU_LATEST_COMMIT_DATE:-Unknown}"
-            echo "SUSFS commit date: ${SUSFS_LATEST_COMMIT_DATE:-Unknown}"
+            echo "Android 版本: ${{ inputs.android_version }}"
+            echo "内核版本: ${{ inputs.kernel_version }}.${{ inputs.sub_level }}"
+            echo "安全补丁级别: ${{ inputs.os_patch_level }}"
+            echo "KernelSU 变体: ${{ inputs.ksu_variant }}"
+            echo "配置名称: ${CONFIG:-未知}"
+            echo "Git 提交: $GITHUB_SHA"
+            echo "工作流地址: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "编译尝试次数: ${COMPILE_ATTEMPTS:-未知}"
+            echo "最终退出码: ${COMPILE_EXIT_CODE:-未知}"
+            echo "KSU 提交日期: ${KSU_LATEST_COMMIT_DATE:-未知}"
+            echo "SUSFS 提交日期: ${SUSFS_LATEST_COMMIT_DATE:-未知}"
           } > "$LOG_DIR/summary.txt"
 
           printf '%s\n' "${{ inputs.ksu_variant }}_kernel-${CONFIG}-Build-Logs" > "$LOG_DIR/artifact-name.txt"
@@ -1937,7 +2013,7 @@ jobs:
           df -h "$GITHUB_WORKSPACE" > "$LOG_DIR/disk-usage.txt" 2>&1 || true
           ccache -s > "$LOG_DIR/ccache-stats.txt" 2>&1 || true
 
-      - name: Upload compile failure logs
+      - name: 上传编译失败日志
         if: ${{ always() && steps.compile_kernel.outcome == 'failure' }}
         uses: actions/upload-artifact@v6
         with:
@@ -1947,7 +2023,7 @@ jobs:
           retention-days: 7
           compression-level: 9
 
-      - name: Prepare Boot image
+      - name: 准备 Boot 镜像
         run: |
           mkdir -p bootimgs
 
@@ -1963,22 +2039,22 @@ jobs:
           cp "$SRC_DIR/Image.lz4" ./
           gzip -n -k -f -9 ./Image > ./Image.gz
 
-      - name: Create AnyKernel3 archive
-        if: inputs.artifact_upload_mode == 'Upload all'
+      - name: 创建 AnyKernel3 压缩包
+        if: inputs.artifact_upload_mode == '上传全部'
         run: |
           cd "$ANYKERNEL3"
           ZIP_NAME="${AK3_NAME}-AnyKernel3.zip"
           mv ../Image ./Image
           zip -r "../$ZIP_NAME" ./*
 
-      - name: Organize AnyKernel3 flashable package (upload-only mode)
-        if: inputs.artifact_upload_mode != 'Upload all'
+      - name: 整理 AnyKernel3 刷入包 (仅上传模式)
+        if: inputs.artifact_upload_mode != '上传全部'
         run: |
           mv ./Image "$ANYKERNEL3/Image"
           mkdir -p "$GITHUB_WORKSPACE/AnyKernel3-package"
           cp -a "$ANYKERNEL3/." "$GITHUB_WORKSPACE/AnyKernel3-package/"
 
-      - name: Build Boot image (Android 12)
+      - name: 构建 Boot 镜像 (Android 12)
         if: inputs.android_version == 'android12'
         working-directory: bootimgs
         run: |
@@ -2009,7 +2085,7 @@ jobs:
           $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-lz4.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
           cp ./boot-lz4.img ../${{ inputs.android_version }}-${{ inputs.kernel_version }}.${NAME_SUBLEVEL}-${{ inputs.os_patch_level }}-boot-lz4.img
 
-      - name: Build Boot image (Android 13+)
+      - name: 构建 Boot 镜像 (Android 13+)
         if: inputs.android_version == 'android13' || inputs.android_version == 'android14' || inputs.android_version == 'android15' || inputs.android_version == 'android16' || inputs.android_version == 'android17'
         working-directory: bootimgs
         run: |
@@ -2027,7 +2103,7 @@ jobs:
           $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-lz4.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
           cp ./boot-lz4.img ../${{ inputs.android_version }}-${{ inputs.kernel_version }}.${NAME_SUBLEVEL}-${{ inputs.os_patch_level }}-boot-lz4.img
 
-      - name: Collect patch conflict files
+      - name: 收集补丁冲突文件
         if: always()
         run: |
           REJECTS_DIR="$GITHUB_WORKSPACE/patch-rejects"
@@ -2035,7 +2111,7 @@ jobs:
 
           mapfile -t REJS < <(find "$KERNEL_ROOT" -type f -name '*.rej')
           REJ_COUNT=${#REJS[@]}
-          echo "Found $REJ_COUNT .rej file(s)"
+          echo "发现 $REJ_COUNT 个 .rej 文件"
           echo "REJ_COUNT=$REJ_COUNT" >> $GITHUB_ENV
 
           if [ "$REJ_COUNT" -gt 0 ]; then
@@ -2053,8 +2129,8 @@ jobs:
             done
           fi
 
-      - name: Upload AnyKernel3 flashable package
-        if: inputs.artifact_upload_mode != 'Upload all'
+      - name: 上传 AnyKernel3 刷入包
+        if: inputs.artifact_upload_mode != '上传全部'
         uses: actions/upload-artifact@v6
         with:
           name: ${{ env.AK3_NAME }}-AnyKernel3
@@ -2062,8 +2138,8 @@ jobs:
           if-no-files-found: error
           compression-level: 9
 
-      - name: Upload all build artifacts
-        if: inputs.artifact_upload_mode == 'Upload all'
+      - name: 上传全部构建产物
+        if: inputs.artifact_upload_mode == '上传全部'
         uses: actions/upload-artifact@v6
         with:
           name: ${{ env.AK3_NAME }}-AnyKernel3
@@ -2072,7 +2148,7 @@ jobs:
             *.img
           compression-level: 9
 
-      - name: Upload patch conflict files
+      - name: 上传补丁冲突文件
         if: always() && env.REJ_COUNT > 0
         uses: actions/upload-artifact@v6
         with:

@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       target_tag:
-        description: 'Target release tag'
+        description: '目标发布标签 (Target Release Tag)'
         required: true
         type: string
       issue_type:
-        description: 'Issue type'
+        description: '问题类型 (Issue Type)'
         required: true
         type: choice
         options:
@@ -16,30 +16,30 @@ on:
           - Bug
           - Critical
       reference:
-        description: 'Issue link or description (optional)'
+        description: '问题链接或说明 (Issue link or description, optional)'
         required: false
         type: string
 
 jobs:
   cleanup:
     runs-on: ubuntu-24.04
-    # Only the repository owner is allowed to run this
+    # 仅允许仓库所有者执行
     if: github.actor == github.repository_owner
 
     steps:
-      # ==================== Verify the release exists ====================
-      - name: Verify the Release exists
+      # ==================== 验证发布是否存在 ====================
+      - name: 验证 Release 存在
         run: |
           if ! gh release view "${{ inputs.target_tag }}" --repo ${{ github.repository }} > /dev/null 2>&1; then
-            echo "::error::Release '${{ inputs.target_tag }}' does not exist"
+            echo "::error::Release '${{ inputs.target_tag }}' 不存在"
             exit 1
           fi
-          echo "✅ Found Release: ${{ inputs.target_tag }}"
+          echo "✅ 找到 Release: ${{ inputs.target_tag }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ==================== Get the original release info ====================
-      - name: Get the original release info
+      # ==================== 获取原始发布信息 ====================
+      - name: 获取原始发布信息
         id: info
         run: |
           gh release view "${{ inputs.target_tag }}" --repo ${{ github.repository }} \
@@ -51,18 +51,18 @@ jobs:
           IS_PRERELEASE=$(jq -r '.isPrerelease' release_info.json)
           echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
 
-          echo "📋 Original title: $(cat original_title.txt)"
+          echo "📋 原标题: $(cat original_title.txt)"
           echo "📋 Pre-release: $IS_PRERELEASE"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ==================== Handle the Normal type ====================
-      - name: Handle the Normal type - mark as normal
+      # ==================== 处理 Normal 类型 ====================
+      - name: 处理 Normal 类型 - 标记正常
         if: inputs.issue_type == 'Normal'
         run: |
           cat > new_body.md << 'EOF'
           > [!TIP]
-          > **This version has been verified and can be used normally.**
+          > **此版本已验证，可正常使用。**
           >
           > **This release has been verified and is safe to use.**
           EOF
@@ -71,7 +71,7 @@ jobs:
 
           if [ -n "${{ inputs.reference }}" ]; then
             echo "" >> new_body.md
-            echo "**Reference**: ${{ inputs.reference }}" >> new_body.md
+            echo "**参考 / Reference**: ${{ inputs.reference }}" >> new_body.md
           fi
 
           echo "" >> new_body.md
@@ -82,17 +82,17 @@ jobs:
           gh release edit "${{ inputs.target_tag }}" --repo ${{ github.repository }} \
             --notes-file new_body.md
 
-          echo "✅ Marked the Release as normal (Normal)"
+          echo "✅ 已标记 Release 为正常 (Normal)"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ==================== Handle the Bug type ====================
-      - name: Handle the Bug type
+      # ==================== 处理 Bug 类型 ====================
+      - name: 处理 Bug 类型
         if: inputs.issue_type == 'Bug'
         run: |
           cat > new_body.md << 'EOF'
           > [!WARNING]
-          > **This version has known bugs; use it with caution.**
+          > **此版本存在已知 Bug，建议谨慎使用。**
           >
           > **This release contains known bugs, use with caution.**
           EOF
@@ -101,7 +101,7 @@ jobs:
 
           if [ -n "${{ inputs.reference }}" ]; then
             echo "" >> new_body.md
-            echo "**Reference**: ${{ inputs.reference }}" >> new_body.md
+            echo "**参考 / Reference**: ${{ inputs.reference }}" >> new_body.md
           fi
 
           echo "" >> new_body.md
@@ -112,22 +112,22 @@ jobs:
           gh release edit "${{ inputs.target_tag }}" --repo ${{ github.repository }} \
             --notes-file new_body.md
 
-          echo "✅ Updated the Release notes (Bug)"
+          echo "✅ 已更新 Release 说明 (Bug)"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ==================== Handle the Critical type ====================
-      - name: Handle the Critical type - delete and recreate
+      # ==================== 处理 Critical 类型 ====================
+      - name: 处理 Critical 类型 - 删除并重建
         if: inputs.issue_type == 'Critical'
         run: |
           ORIGINAL_TITLE=$(cat original_title.txt)
 
-          # Build the warning message
+          # 构建警告信息
           cat > new_body.md << 'EOF'
           > [!CAUTION]
-          > **The assets of this release contain a severe bug that causes system freezes; all attachments have been removed!**
+          > **本次发布的资源包含导致死机的严重 Bug，所有附件已被清除！**
           >
-          > **Do not use this version; wait for a fixed release.**
+          > **请勿使用此版本，等待修复版本发布。**
           >
           > **This release contained a critical bug causing device crashes. All assets have been removed!**
           >
@@ -138,7 +138,7 @@ jobs:
 
           if [ -n "${{ inputs.reference }}" ]; then
             echo "" >> new_body.md
-            echo "**Reference**: ${{ inputs.reference }}" >> new_body.md
+            echo "**参考 / Reference**: ${{ inputs.reference }}" >> new_body.md
           fi
 
           echo "" >> new_body.md
@@ -146,33 +146,33 @@ jobs:
           echo "" >> new_body.md
           cat original_body.txt >> new_body.md
 
-          # Delete the Release (keep the Git tag)
-          echo "🗑️ Deleting the original Release..."
+          # 删除 Release（保留 Git Tag）
+          echo "🗑️ 删除原 Release..."
           gh release delete "${{ inputs.target_tag }}" --repo ${{ github.repository }} --yes
 
-          # Determine the prerelease flag
+          # 确定 prerelease 标志
           PRERELEASE_FLAG=""
           if [ "${{ steps.info.outputs.is_prerelease }}" == "true" ]; then
             PRERELEASE_FLAG="--prerelease"
           fi
 
-          # Recreate the Release (without uploading any files)
-          echo "🔄 Recreating the Release..."
+          # 重建 Release（不上传任何文件）
+          echo "🔄 重建 Release..."
           gh release create "${{ inputs.target_tag }}" --repo ${{ github.repository }} \
             --title "$ORIGINAL_TITLE" \
             --notes-file new_body.md \
             $PRERELEASE_FLAG
 
-          echo "✅ Removed all attachments and recreated the Release (Critical)"
+          echo "✅ 已清除所有附件并重建 Release (Critical)"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ==================== Completion notice ====================
-      - name: Done
+      # ==================== 完成通知 ====================
+      - name: 完成
         run: |
           echo "=========================================="
-          echo "🎯 Target tag: ${{ inputs.target_tag }}"
-          echo "📌 Issue type: ${{ inputs.issue_type }}"
-          echo "📝 Reference: ${{ inputs.reference || 'None' }}"
+          echo "🎯 目标标签: ${{ inputs.target_tag }}"
+          echo "📌 问题类型: ${{ inputs.issue_type }}"
+          echo "📝 参考信息: ${{ inputs.reference || '无' }}"
           echo "=========================================="
-          echo "✅ Emergency cleanup complete!"
+          echo "✅ 紧急清理完成！"
