@@ -1,21 +1,19 @@
 #!/usr/bin/env python3
-# Normalize trace/hooks context in SUSFS main-patch hunks that insert susfs_def.h.
+# 归一化 SUSFS 主补丁中「插入 susfs_def.h」hunk 的 trace/hooks 上下文
 #
-# Background:
-#   On 2026-10-18, SUSFS rebased the gki-android13-5.15 main patch onto 5.15.211.
-#   The first hunks in fs/proc/task_mmu.c and fs/namespace.c now use
-#   `#include <trace/hooks/mm.h>` / `#include <trace/hooks/blk.h>` as context.
-#   - GKI 5.15.74-194 sources lack these lines, so the entire hunk is rejected ->
-#     susfs_def.h is not included -> SUSFS_IS_INODE_* are implicitly declared ->
-#     compilation fails under clang -Werror.
-#   - 5.15.220 (LTS) already contains these lines, but the old script removed them
-#     to match the pre-rebase patch, also causing the entire hunk to be rejected.
+# 背景：
+#   SUSFS 上游 2026-10-18 把 gki-android13-5.15 主补丁 rebase 到 5.15.211，
+#   fs/proc/task_mmu.c 与 fs/namespace.c 的首个 hunk 变为以
+#   `#include <trace/hooks/mm.h>` / `#include <trace/hooks/blk.h>` 作为上下文。
+#   - 5.15.74~194 的 GKI 源码没有这两行，hunk 整段被拒 ->
+#     susfs_def.h 未引入 -> SUSFS_IS_INODE_* 隐式声明 -> clang -Werror 中断编译；
+#   - 5.15.220(LTS) 原生含这两行，旧脚本却为匹配 rebase 前的补丁把它们删掉，
+#     同样导致整段被拒。
 #
-# Strategy:
-#   Process only hunks whose body contains susfs_def.h. If a trace/hooks context line
-#   from such a hunk is absent from the target file header, remove it from a patch copy
-#   and recalculate the hunk line counts. Do not modify source files. If the target
-#   already contains the line, leave the patch unchanged.
+# 策略：
+#   只处理「补丁体中出现 susfs_def.h」的 hunk；若该 hunk 的 trace/hooks 上下文行
+#   在目标文件头部不存在，就把这行从补丁副本中剔除并重算 hunk 行数。源码本身
+#   不做任何增删。目标文件已有该行时保持补丁原样。
 import re
 import sys
 
@@ -25,7 +23,7 @@ HEAD_LIMIT = 200
 
 
 def read_head(path):
-    """Return stripped contents of the target file's first HEAD_LIMIT lines, or None if absent."""
+    """返回目标文件前 HEAD_LIMIT 行的去空白内容，文件不存在时返回 None。"""
     try:
         with open(path, encoding='utf-8', errors='surrogateescape') as f:
             head = []
@@ -92,14 +90,14 @@ def normalize(patch_path):
     if dropped:
         with open(patch_path, 'w', encoding='utf-8', errors='surrogateescape', newline='\n') as f:
             f.write('\n'.join(out) + '\n')
-        print('Normalized SUSFS patch context: removed %d missing trace/hooks context line(s) from %s'
+        print('SUSFS 补丁上下文已归一化：%s 移除 %d 行缺失的 trace/hooks 上下文'
               % (', '.join(sorted(touched)), dropped))
     else:
-        print('SUSFS header context does not need normalization.')
+        print('SUSFS 头文件上下文无需归一化')
 
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
-        print('Usage: normalize_trace_ctx.py <patch>', file=sys.stderr)
+        print('用法: normalize_trace_ctx.py <patch>', file=sys.stderr)
         sys.exit(2)
     normalize(sys.argv[1])

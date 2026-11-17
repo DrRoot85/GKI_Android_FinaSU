@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * hmbird_patch - Force the OPLUS HMBird kernel type from HMBIRD_OGKI to HMBIRD_GKI.
+ * hmbird_patch - 将 OPLUS HMBird 内核类型从 HMBIRD_OGKI 强制改为 HMBIRD_GKI
  *
- * The OPLUS HMBird framework determines the kernel type from the "type" property
- * of the /soc/oplus,hmbird/version_type device-tree node. OGKI = official GKI;
- * GKI = custom GKI. This patch changes the value early during boot so the system
- * does not apply restrictions to a custom kernel.
+ * OPLUS 的 HMBird 框架通过设备树节点 /soc/oplus,hmbird/version_type
+ * 中的 "type" 属性判断内核类型。OGKI = 官方 GKI，GKI = 自定义 GKI。
+ * 本补丁在启动早期将其改写，使系统不对自定义内核施加限制。
  */
 
 #include <linux/init.h>
@@ -30,12 +29,12 @@ static int __init hmbird_patch_init(void)
 	if (!np)
 		return 0;
 
-	/* Read the current value; skip unless it is OGKI. */
+	/* 读取当前值，不是 OGKI 则跳过 */
 	ret = of_property_read_string(np, HMBIRD_PROP_NAME, &type);
 	if (ret || strcmp(type, HMBIRD_OGKI))
 		goto out;
 
-	/* Construct the new property (kzalloc zero-initializes all fields). */
+	/* 构造新属性（kzalloc 确保所有字段零初始化） */
 	new_prop = kzalloc(sizeof(*new_prop), GFP_KERNEL);
 	if (!new_prop)
 		goto out;
@@ -47,7 +46,7 @@ static int __init hmbird_patch_init(void)
 	if (!new_prop->name || !new_prop->value)
 		goto free_prop;
 
-	/* Atomically replace the property with of_update_property; safer than remove + add. */
+	/* of_update_property 原子替换，比 remove + add 更安全 */
 	ret = of_update_property(np, new_prop);
 	if (ret) {
 		pr_info("hmbird_patch: of_update_property failed (%d)\n", ret);
