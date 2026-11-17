@@ -1,31 +1,31 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""builtin 分支 seccomp 过滤模式改造脚本。
+"""Convert the builtin branch to seccomp filtering mode.
 
-背景:
-  SukiSU-Ultra builtin 分支在 app 启动路径 (zygote setresuid 钩子,
-  kernel/hook/lsm_hook.c) 对管理器与授权应用直接调用 disable_seccomp(),
-  导致管理器进程自身的 seccomp 过滤器被清除, 管理器首页
-  "Seccomp 状态" 显示"未启用"。main 分支 / BakaSU 的对应实现是:
-  保留过滤器 ("过滤模式"), 仅通过 seccomp action cache 放行 reboot。
+Background:
+    During app startup (zygote setresuid hook, kernel/hook/lsm_hook.c), SukiSU-Ultra's builtin branch
+    directly calls disable_seccomp() for the manager and authorized apps,
+    clearing the manager process's seccomp filter so the manager's home screen
+    shows "Seccomp status: Not enabled". The corresponding implementation in main/BakaSU is to
+    keep the filter ("Filtering mode") and allow reboot only through the seccomp action cache.
 
-处理:
-  1. kernel/hook/lsm_hook.c: 6 处 disable_seccomp() 调用点改写为
-     ">=5.10 保留过滤器并放行 reboot / <5.10 维持 disable_seccomp()"
-     (seccomp action cache 由 GKI 5.10+ 内核 backport, 与 BakaSU 一致);
-     并在文件头部补 infra/seccomp_cache.h 原型声明。
-  2. 聚合编译文件 (kernel/ksu.c，上游 2026-10-19 重构后更名 kernel/ksu_main.c):
-     在 infra/event_queue.c 之后聚合编译 infra/seccomp_cache.c (builtin 为单编译单元)。
+Implementation:
+  1. kernel/hook/lsm_hook.c:      Rewrite six disable_seccomp() call sites as
+          ">=5.10 keep the filter and allow reboot / <5.10 retain disable_seccomp()"
+          (the seccomp action cache is backported to GKI 5.10+ kernels, matching BakaSU);
+          also add the infra/seccomp_cache.h prototype declaration at the top of the file.
+  2.   2. Aggregate source file (kernel/ksu.c, renamed to kernel/ksu_main.c by the upstream refactor on 2026-10-19):
+          Include infra/seccomp_cache.c after infra/event_queue.c (builtin is a single compilation unit).
 
-所有替换严格校验命中次数, 上游代码变化时报错退出 (幂等可重入)。
-用法: python3 seccomp_filter_mode.py <KernelSU 目录>
+All replacements verify the exact match count and fail if upstream code changes; the script is idempotent and safe to rerun.
+Usage: python3 seccomp_filter_mode.py <KernelSU directory>
 """
 
 import re
 import sys
 from pathlib import Path
 
-# 保留过滤器时的替换块 (列 0 预处理指令, 与 BakaSU 上游写法一致)
+# Replacement block that keeps the filter (preprocessor directives at column 0, matching upstream BakaSU)
 CACHE_BLOCK = (
     "#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)\n"
     "        if (current->seccomp.mode == SECCOMP_MODE_FILTER && current->seccomp.filter) {\n"
@@ -38,26 +38,26 @@ CACHE_BLOCK = (
     "#endif"
 )
 
-# (编译正则, 预期命中次数, 说明)
-# SUSFS 路径: handle_zygote_setresuid / handle_zygote_next_setresuid 各 1 处管理器 + 1 处授权应用
-# 非 SUSFS 路径: ksu_task_fix_setuid 各 1 处
+# (compiled regex, expected match count, description)
+# SUSFS path: one manager and one authorized-app call in each of handle_zygote_setresuid / handle_zygote_next_setresuid
+# Non-SUSFS path: one call in each ksu_task_fix_setuid branch
 LSM_RULES = [
     (re.compile(
         r'(if \(likely\(ksu_is_manager_appid_valid\(\)\) && unlikely\(is_uid_manager\(ruid\)\)\) \{\n)'
         r'        disable_seccomp\(\);'),
-     2, "SUSFS 管理器分支"),
+     2, "SUSFS manager branch"),
     (re.compile(
         r'(if \(ksu_is_allow_uid_for_current\(ruid\)\) \{\n)'
         r'        disable_seccomp\(\);'),
-     2, "SUSFS 授权应用分支"),
+     2, "SUSFS authorized-app branch"),
     (re.compile(
         r'(if \(unlikely\(is_uid_manager\(new_uid\)\)\) \{\n)'
         r'        disable_seccomp\(\);'),
-     1, "非 SUSFS 管理器分支"),
+     1, "Non-SUSFS manager branch"),
     (re.compile(
         r'(if \(ksu_is_allow_uid_for_current\(new_uid\)\) \{\n)'
         r'        disable_seccomp\(\);'),
-     1, "非 SUSFS 授权应用分支"),
+     1, "Non-SUSFS authorized-app branch"),
 ]
 
 KSU_ANCHOR = re.compile(r'(#include "infra/event_queue\.c"\n)')
@@ -69,31 +69,31 @@ def patch_lsm(path: Path) -> None:
     for pattern, expected, name in LSM_RULES:
         text, n = pattern.subn(lambda m: m.group(1) + CACHE_BLOCK, text)
         if n != expected:
-            sys.exit(f"::error::lsm_hook.c {name} 命中 {n} 处 (预期 {expected})，"
-                     f"SukiSU builtin 上游代码可能已变化，请更新补丁")
+            sys.exit(f"::error::lsm_hook.c {name}: matched {n} occurrence(s) (expected {expected}); "
+                     f"SukiSU builtin upstream code may have changed; update the patch")
         total += n
     if '#include "infra/seccomp_cache.h"' not in text:
         text = '#include "infra/seccomp_cache.h"\n\n' + text
     path.write_text(text, encoding="utf-8")
-    print(f"lsm_hook.c: 已改写 {total} 处 disable_seccomp() 调用点为过滤模式")
+    print(f"lsm_hook.c: converted {total} disable_seccomp() call site(s) to filtering mode")
 
 
 def patch_ksu(path: Path) -> None:
     text = path.read_text(encoding="utf-8")
     if '#include "infra/seccomp_cache.c"' in text:
-        print(f"{path.name}: 已包含 seccomp_cache.c 聚合编译，跳过")
+        print(f"{path.name}: seccomp_cache.c is already included for aggregate compilation; skipping")
         return
     text, n = KSU_ANCHOR.subn(
         lambda m: m.group(1) + '#include "infra/seccomp_cache.c"\n', text)
     if n != 1:
-        sys.exit(f"::error::{path.name} 未找到 infra/event_queue.c 聚合锚点，"
-                 "SukiSU builtin 上游代码可能已变化，请更新补丁")
+        sys.exit(f"::error::{path.name}: infra/event_queue.c aggregate anchor not found; "
+                 "SukiSU builtin upstream code may have changed; update the patch")
     path.write_text(text, encoding="utf-8")
-    print(f"{path.name}: 已插入 infra/seccomp_cache.c 聚合编译")
+    print(f"{path.name}: added infra/seccomp_cache.c to aggregate compilation")
 
 
 def find_aggregate(kdir: Path) -> Path | None:
-    # 上游 2026-10-19 重构把 kernel/ksu.c 更名为 kernel/ksu_main.c，两者都支持
+    # The 2026-10-19 upstream refactor renamed kernel/ksu.c to kernel/ksu_main.c; support both names
     for name in ("ksu.c", "ksu_main.c"):
         p = kdir / "kernel" / name
         if p.is_file():
@@ -103,13 +103,13 @@ def find_aggregate(kdir: Path) -> Path | None:
 
 def main() -> None:
     if len(sys.argv) != 2:
-        sys.exit(f"用法: {sys.argv[0]} <KernelSU 目录>")
+        sys.exit(f"Usage: {sys.argv[0]} <KernelSU directory>")
     kdir = Path(sys.argv[1])
     lsm = kdir / "kernel" / "hook" / "lsm_hook.c"
     ksu = find_aggregate(kdir)
     if not lsm.is_file() or ksu is None:
-        sys.exit(f"::error::未找到 {lsm} 或 kernel/{{ksu,ksu_main}}.c，"
-                 "SukiSU builtin 目录结构可能已变化")
+        sys.exit(f"::error::Could not find {lsm} or kernel/{{ksu,ksu_main}}.c; "
+                 "SukiSU builtin directory structure may have changed")
     patch_lsm(lsm)
     patch_ksu(ksu)
 

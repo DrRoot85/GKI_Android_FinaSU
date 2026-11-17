@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""从 common/BUILD.bazel 完整移除 kmi_symbol_list_strict_mode。
+"""Remove kmi_symbol_list_strict_mode completely from common/BUILD.bazel.
 
-GKI 各分支里该属性有三种形态：
-  * 单行规则属性      kmi_symbol_list_strict_mode = True/False,
-  * target_configs 字典条目 "kmi_symbol_list_strict_mode": True/False,
-  * 多行 select({...}) 块（android17-6.18，按 page_size 条件取值）
+This property appears in three forms across GKI branches:
+  * Single-line rule property: kmi_symbol_list_strict_mode = True/False,
+  * target_configs dictionary entry: "kmi_symbol_list_strict_mode": True/False,
+  * Multi-line select({...}) block (android17-6.18, with values selected by page_size)
 
-原先的 `sed '/kmi_symbol_list_strict_mode/d'` 只会删掉 select 块的首行，
-残留孤儿字典字面量导致 BUILD.bazel 语法错误（bazel 解析失败，包内所有
-目标不可见）。这里按形态匹配，整个属性/条目/块一起移除。
+The old `sed '/kmi_symbol_list_strict_mode/d'` command removed only the first line of a select block,
+leaving an orphaned dictionary literal and causing a BUILD.bazel syntax error (Bazel parsing fails, and all
+targets in the package become unavailable). Match each form and remove the entire property, entry, or block.
 """
 
 import re
@@ -26,22 +26,22 @@ def main() -> int:
 
     total = src.count("kmi_symbol_list_strict_mode")
 
-    # 单行规则属性（kernel_build/common_kernel 调用）
+    # Single-line rule property (kernel_build/common_kernel invocation)
     src = re.sub(
         r"^[ \t]*kmi_symbol_list_strict_mode[ \t]*=[ \t]*(?:True|False),[ \t]*\n",
         "",
         src,
         flags=re.M,
     )
-    # target_configs 字典条目
+    # target_configs dictionary entry
     src = re.sub(
         r'^[ \t]*"kmi_symbol_list_strict_mode"[ \t]*:[ \t]*(?:True|False),[ \t]*\n',
         "",
         src,
         flags=re.M,
     )
-    # 多行 select({...}) 块：字典体只有平铺的 "label": value 行，
-    # 首个 "}),  即块结尾
+    # Multi-line select({...}) block: the dictionary body contains only flat "label": value lines,
+    # and the first "})," marks the end of the block
     src = re.sub(
         r"^[ \t]*kmi_symbol_list_strict_mode[ \t]*=[ \t]*select\(\{.*?\}\),[ \t]*\n",
         "",
@@ -52,7 +52,7 @@ def main() -> int:
     removed = total - src.count("kmi_symbol_list_strict_mode")
     with open(path, "w", encoding="utf-8", errors="surrogateescape") as f:
         f.write(src)
-    print("BUILD.bazel: 已移除 %d 处 kmi_symbol_list_strict_mode" % removed)
+    print("BUILD.bazel: removed %d instance(s) of kmi_symbol_list_strict_mode" % removed)
     return 0
 
 

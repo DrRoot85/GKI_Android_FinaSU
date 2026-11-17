@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""为原生 KernelSU (tiann/KernelSU) 添加 SUSFS 支持。
+"""Add SUSFS support to native KernelSU (tiann/KernelSU).
 
-tiann/KernelSU 结构可能随提交而变化：
-- kernel/core/init.c: 包含 kernelsu_init() 函数
-- kernel/Kconfig: 菜单定义
-- kernel/Kbuild: 编译单元
+The tiann/KernelSU structure may change between commits:
+- kernel/core/init.c: contains the kernelsu_init() function
+- kernel/Kconfig: menu definitions
+- kernel/Kbuild: compilation units
 
-simonpunk/susfs4ksu 的补丁针对 flat kernel/ksu.c，与 tiann/KernelSU 结构不匹配，
-故直接修改源码。如果无法自动集成，则返回非零退出码以便上层回退到手工 sed。
+The simonpunk/susfs4ksu patch targets flat kernel/ksu.c and does not match the tiann/KernelSU structure,
+so modify the source directly. If automatic integration fails, return a nonzero exit code so the caller can fall back to manual sed edits.
 """
 
 import sys
@@ -17,7 +17,7 @@ KSU_KERNEL = Path("KernelSU/kernel")
 
 
 def modify_kconfig():
-    """在 Kconfig 中添加完整的 KSU_SUSFS 菜单"""
+    """Add the complete KSU_SUSFS menu to Kconfig."""
     kconfig = KSU_KERNEL / "Kconfig"
     if not kconfig.exists():
         print(f"WARNING: {kconfig} not found, skipping SUSFS menu for KernelSU", file=sys.stderr)
@@ -89,7 +89,7 @@ def modify_kconfig():
     )
     idx = s.find(marker)
     if idx < 0:
-        # 尝试其他 endmenu 变体
+        # Try other endmenu variants
         for m in ("endmenu\r\n", "endmenu"):
             idx = s.find(m)
             if idx >= 0:
@@ -104,7 +104,7 @@ def modify_kconfig():
 
 
 def modify_init_c():
-    """在 init.c 中添加 SUSFS 支持"""
+    """Add SUSFS support to init.c."""
     init_c = KSU_KERNEL / "core" / "init.c"
     if not init_c.exists():
         print(f"ERROR: {init_c} not found, cannot integrate SUSFS for KernelSU", file=sys.stderr)
@@ -112,8 +112,8 @@ def modify_init_c():
     s = init_c.read_text(encoding="utf-8")
     changed = False
 
-    # 步骤1：添加 #include <linux/susfs.h>
-    # 尝试多个可能的调度头文件锚点
+    # Step 1: add #include <linux/susfs.h>
+    # Try several possible scheduler-header anchors
     include_added = False
     for marker in ("#include <linux/sched.h>", "#include <linux/sched/task.h>",
                    "#include <linux/sched/signal.h>", "#include <linux/sched/wake_q.h>"):
@@ -123,13 +123,13 @@ def modify_init_c():
         if marker in s:
             s = s.replace(marker, marker + "\n#include <linux/susfs.h>", 1)
             include_added = True
-            print(f"init.c: 添加 #include <linux/susfs.h> 在 {marker} 之后")
+            print(f"init.c: added #include <linux/susfs.h> after {marker}")
             changed = True
             break
     if not include_added and "#include <linux/susfs.h>" not in s:
-        print("WARNING: 未找到适合的调度头文件锚点，跳过 #include <linux/susfs.h> 插入", file=sys.stderr)
+        print("WARNING: no suitable scheduler-header anchor found; skipping #include <linux/susfs.h> insertion", file=sys.stderr)
 
-    # 步骤2：移除 ksu_syscall_hook_manager_init() / ksu_syscall_hook_init()
+    # Step 2: remove ksu_syscall_hook_manager_init() / ksu_syscall_hook_init()
     for hook_call in ("ksu_syscall_hook_manager_init();", "ksu_syscall_hook_init();",
                       "ksu_syscall_hook_manager_init ();", "ksu_syscall_hook_init ();"):
         count_before = s.count(hook_call)
@@ -140,12 +140,12 @@ def modify_init_c():
                 "    #endif"
             )
             s = s.replace(hook_call, replacement)
-            print(f"init.c: 替换 {count_before} 处 {hook_call}", file=sys.stderr)
+            print(f"init.c: replaced {count_before} occurrence(s) of {hook_call}", file=sys.stderr)
             changed = True
 
-    # 步骤3：如果仍未找到 susfs_init()，在 kernelsu_init() 函数体内插入
+    # Step 3: if susfs_init() is still missing, insert it into the kernelsu_init() function body
     if "susfs_init()" not in s:
-        # 尝试多个函数名模式
+        # Try several function-name patterns
         func_found = False
         for func_pattern in ("kernelsu_init(", "ksu_init(", "init_kernelsu("):
             idx = s.find(func_pattern)
@@ -160,12 +160,12 @@ def modify_init_c():
                     )
                     s = s[:ret_idx] + insertion + s[ret_idx:]
                     changed = True
-                    print("init.c: 在 kernelsu_init() 中插入 susfs_init()", file=sys.stderr)
+                    print("init.c: inserted susfs_init() into kernelsu_init()", file=sys.stderr)
                 else:
-                    print("WARNING: 未找到 kernelsu_init() 中的 return 0;，跳过 susfs_init() 插入", file=sys.stderr)
+                    print("WARNING: return 0; not found in kernelsu_init(); skipping susfs_init() insertion", file=sys.stderr)
                 break
         if not func_found:
-            print("WARNING: 未找到 kernelsu_init() 函数，跳过 susfs_init() 插入", file=sys.stderr)
+            print("WARNING: kernelsu_init() function not found; skipping susfs_init() insertion", file=sys.stderr)
 
     if changed:
         init_c.write_text(s, encoding="utf-8")
@@ -180,15 +180,15 @@ def modify_init_c():
 
 
 def modify_kbuild():
-    """在 Kbuild 中移除旧 hook 编译单元"""
+    """Remove obsolete hook compilation units from Kbuild."""
     kbuild = KSU_KERNEL / "Kbuild"
     if not kbuild.exists():
         print(f"WARNING: {kbuild} not found, skipping Kbuild cleanup", file=sys.stderr)
         return True
     s = kbuild.read_text(encoding="utf-8")
     changed = False
-    # 与 upstream 10_enable_susfs_for_ksu.patch 保持一致：移除所有
-    # 与 SUSFS 冲突的 hook 编译单元，包括顶层和 ifeq 块内的 arch-specific 行
+    # Match upstream 10_enable_susfs_for_ksu.patch: remove all
+    # hook compilation units that conflict with SUSFS, including top-level and architecture-specific lines inside ifeq blocks
     for obj in (
         "kernelsu-objs += hook/lsm_hook.o",
         "kernelsu-objs += hook/syscall_event_bridge.o",
@@ -218,9 +218,9 @@ def main():
     init_ok = modify_init_c()
     kbuild_ok = modify_kbuild()
 
-    # init.c 是关键：没有 susfs_init() 就没有 SUSFS
+    # init.c is critical: without susfs_init(), SUSFS is not initialized
     if not init_ok:
-        print("ERROR: 无法在 KernelSU init.c 中集成 SUSFS，构建将中断", file=sys.stderr)
+        print("ERROR: could not integrate SUSFS into KernelSU init.c; stopping the build", file=sys.stderr)
         sys.exit(1)
     sys.exit(0)
 

@@ -1,29 +1,29 @@
 #!/usr/bin/env bash
-# SukiSU 内核源码 API 兼容补丁（SukiSU-Ultra builtin / main 分支均适用）
+# Kernel API compatibility patches for SukiSU source (applies to SukiSU-Ultra builtin and main branches)
 #
-# 背景：
-#   1) builtin 分支 kernel/hook/lsm_hook.c 仍以旧签名
-#      security_add_hooks(hooks, count, "ksu") 注册 LSM 钩子，
-#      6.8+ 内核要求 (hooks, count, const struct lsm_id *)，
-#      android16-6.12 GKI 编译报 -Wincompatible-pointer-types（-Werror）；
-#   2) builtin 在 app 启动路径对管理器/授权应用 disable_seccomp()，
-#      管理器首页 "Seccomp 状态" 显示"未启用"；改为对齐 main 分支/BakaSU
-#      的过滤模式（保留 seccomp 过滤器 + action cache 放行 reboot）。
+# Background:
+#   1) 1) The builtin branch's kernel/hook/lsm_hook.c still uses the old signature
+#         security_add_hooks(hooks, count, "ksu") to register LSM hooks;
+#         kernels 6.8 and later require (hooks, count, const struct lsm_id *),
+#         causing android16-6.12 GKI builds to fail with -Wincompatible-pointer-types (-Werror);
+#   2) 2) The builtin branch calls disable_seccomp() for the manager and authorized apps during app startup,
+#         so the manager's "Seccomp status" shows "Not enabled". Change this to match main/BakaSU's
+#         filtering mode (keep the seccomp filter and allow reboot through the action cache).
 #
-# 已由上游修复、本仓库随之移除的适配（核对 builtin 5ef32ad / main 31255c4）：
-#   - arch.h 缺失：builtin 已自带 kernel/arch.h（与本仓库旧副本逐字节一致）
-#   - EVENT_SERVICES 缺失 / rules.c 重复声明：builtin 已随 UAPI 6 同步修复
-#   - pkg_observer 的 track_throne(TRACK_THRONE_FORCE_SYNCHRONOUS)：已改回 false
-#   - supercall.h 的 KSU_IOCTL_KPM 笔误 / KSU_IOCTL_MANAGER 缺声明：
-#     上游已把 KPM / MANAGER 等并入统一的 KSU_IOCTL_EXTENSION，旧常量不复存在
-#   - throne_tracker 的 crown_manager 裸 return / pkg 作用域：上游已修正
-#   - netlink_kernel_cfg.cb_mutex（Linux 6.11 移除）：上游已改为构建期探测
-#     目标 netlink.h 并定义 KSU_NETLINK_CFG_HAS_CB_MUTEX，super_access.c
-#     以 #ifdef 守卫该成员（main: kernel/Kbuild / builtin: kernel/Makefile）
+# Adaptations removed after upstream fixes (verified against builtin 5ef32ad / main 31255c4):
+#   - Missing arch.h: builtin now includes kernel/arch.h (byte-for-byte identical to this repository's former copy)
+#   - Missing EVENT_SERVICES / duplicate declaration in rules.c: fixed upstream in builtin with UAPI 6
+#   - pkg_observer track_throne(TRACK_THRONE_FORCE_SYNCHRONOUS): reverted to false
+#   - KSU_IOCTL_KPM typo / missing KSU_IOCTL_MANAGER declaration in supercall.h:
+#     upstream merged KPM / MANAGER and others into KSU_IOCTL_EXTENSION; the old constants no longer exist
+#   - Bare return / pkg scope in throne_tracker crown_manager: fixed upstream
+#   - netlink_kernel_cfg.cb_mutex (removed in Linux 6.11): upstream now detects it at build time
+#     the target netlink.h and defines KSU_NETLINK_CFG_HAS_CB_MUTEX; super_access.c
+#     guards the member with #ifdef (main: kernel/Kbuild / builtin: kernel/Makefile)
 #
-# 修复均以内容检测守卫，上游自行修复后自动跳过，重复执行幂等。
+# All fixes are guarded by content checks, automatically skipped after upstream fixes, and safe to rerun.
 #
-# 用法: apply.sh [KernelSU 目录]（调用方工作目录需为 $KERNEL_ROOT）
+# Usage: apply.sh [KernelSU directory] (the caller's working directory must be $KERNEL_ROOT)
 
 set -eo pipefail
 
@@ -31,10 +31,10 @@ KSU_DIR="${1:-KernelSU}"
 
 fail() {
   if [ "$SKIP_INCOMPATIBLE" = "true" ]; then
-    echo "::warning title=SukiSU 兼容补丁已跳过::$1"
+    echo "::warning title=SukiSU compatibility patch skipped::$1"
     if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
       echo "" >> "$GITHUB_STEP_SUMMARY"
-      echo "> ⏭️ **SukiSU API 兼容补丁** 已自动跳过：$1（构建未中断）" >> "$GITHUB_STEP_SUMMARY"
+      echo "> ⏭️ **SukiSU API compatibility patch** was skipped automatically: $1 (build continues)" >> "$GITHUB_STEP_SUMMARY"
     fi
     exit 0
   fi
@@ -42,52 +42,52 @@ fail() {
   exit 1
 }
 
-[ -d "$KSU_DIR" ] || fail "未找到 KernelSU 目录: $KSU_DIR"
+[ -d "$KSU_DIR" ] || fail "KernelSU directory not found: $KSU_DIR"
 
 COMPAT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 LSM_FILE="$KSU_DIR/kernel/hook/lsm_hook.c"
 if [ -f "$LSM_FILE" ] && grep -q 'security_add_hooks(ksu_hooks, ARRAY_SIZE(ksu_hooks), "ksu");' "$LSM_FILE"; then
   if grep -q 'ksu_lsm_id' "$LSM_FILE"; then
-    echo "lsm_hook.c 已包含 lsm_id 兼容代码，跳过"
+    echo "lsm_hook.c already contains lsm_id compatibility code; skipping"
   else
-    echo "应用 lsm_id 兼容补丁 (6.8+ security_add_hooks 新签名)..."
+    echo "Applying lsm_id compatibility patch (security_add_hooks signature for 6.8+)..."
     patch -p1 --forward -d "$KSU_DIR" < "$COMPAT_DIR/sukisu-lsm-id-6.8.patch" \
-      || fail "lsm_id 兼容补丁应用失败（SukiSU 上游代码可能已变化）"
+      || fail "Failed to apply the lsm_id compatibility patch (SukiSU upstream source may have changed)"
     grep -q 'struct lsm_id ksu_lsm_id' "$LSM_FILE" \
-      || fail "lsm_id 兼容补丁应用后校验失败"
-    echo "lsm_hook.c: 6.8+ 已切换为 struct lsm_id 注册"
+      || fail "Validation failed after applying the lsm_id compatibility patch"
+    echo "lsm_hook.c: switched to struct lsm_id registration for 6.8+"
   fi
 else
-  echo "lsm_hook.c 不存在或无需 lsm_id 兼容补丁，跳过"
+  echo "lsm_hook.c does not exist or does not need the lsm_id compatibility patch; skipping"
 fi
 
-# ---- Seccomp 过滤模式（builtin 分支）----
-# 背景：builtin 分支在 app 启动路径（zygote setresuid 钩子）对管理器与授权
-# 应用直接调用 disable_seccomp()，管理器进程自身的 seccomp 过滤器被清除，
-# 管理器首页 "Seccomp 状态" 显示"未启用"。main 分支 / BakaSU 的对应实现是
-# 保留过滤器（"过滤模式"），仅通过 seccomp action cache（GKI 5.10+ backport）
-# 放行 reboot。
-# 处理：改写 lsm_hook.c 的 6 处 disable_seccomp() 调用点为 cache-allow 形式，
-# 分发 infra/seccomp_cache.c/h 并在 ksu.c（上游重构后为 ksu_main.c）聚合编译；>=5.10 保留过滤器，
-# <5.10 维持 disable_seccomp() 原行为（action cache 不存在）。
-# 守卫：仅命中 builtin 的 handle_zygote_setresuid 时执行，main 分支自动跳过；
-# 上游自行修复后幂等跳过。
+# ---- Seccomp filtering mode (builtin branch)----
+# Background: during app startup (zygote setresuid hook), the builtin branch directly calls disable_seccomp() for the manager and authorized apps,
+# authorized apps, clearing the manager process's seccomp filter;
+# the manager's "Seccomp status" then shows "Not enabled". The corresponding implementation in main/BakaSU
+# keeps the filter ("Filtering mode") and uses the seccomp action cache (backported to GKI 5.10+) only to
+# allow reboot.
+# Implementation: rewrite six disable_seccomp() call sites in lsm_hook.c to use cache-allow,
+# copy infra/seccomp_cache.c/h and include them in ksu.c (renamed ksu_main.c after an upstream refactor); keep the filter on >=5.10,
+# and preserve the original disable_seccomp() behavior on <5.10 (the action cache is unavailable).
+# Guard: run only when builtin handle_zygote_setresuid is present; skip the main branch automatically.
+# Skip idempotently after an upstream fix.
 if [ -f "$LSM_FILE" ] && grep -q 'handle_zygote_setresuid' "$LSM_FILE"; then
   if grep -q 'ksu_seccomp_allow_cache' "$LSM_FILE"; then
-    echo "lsm_hook.c 已包含 seccomp 过滤模式逻辑，跳过"
+    echo "lsm_hook.c already contains seccomp filtering-mode logic; skipping"
   else
-    echo "应用 seccomp 过滤模式补丁 (对齐 main 分支/BakaSU：管理器与授权应用保留 seccomp 过滤器)..."
-    [ -d "$KSU_DIR/kernel/infra" ] || fail "未找到 $KSU_DIR/kernel/infra 目录，SukiSU builtin 结构可能已变化"
+    echo "Applying seccomp filtering-mode patch (match main/BakaSU: keep seccomp filters for the manager and authorized apps)..."
+    [ -d "$KSU_DIR/kernel/infra" ] || fail "$KSU_DIR/kernel/infra directory not found; SukiSU builtin structure may have changed"
     cp "$COMPAT_DIR/seccomp_cache.h" "$KSU_DIR/kernel/infra/seccomp_cache.h" \
-      || fail "seccomp_cache.h 分发失败"
+      || fail "Failed to copy seccomp_cache.h"
     cp "$COMPAT_DIR/seccomp_cache.c" "$KSU_DIR/kernel/infra/seccomp_cache.c" \
-      || fail "seccomp_cache.c 分发失败"
+      || fail "Failed to copy seccomp_cache.c"
     python3 "$COMPAT_DIR/seccomp_filter_mode.py" "$KSU_DIR" \
-      || fail "seccomp 过滤模式补丁应用失败（SukiSU builtin 上游代码可能已变化）"
+      || fail "Failed to apply the seccomp filtering-mode patch (SukiSU builtin upstream source may have changed)"
     grep -q 'ksu_seccomp_allow_cache' "$LSM_FILE" \
-      || fail "seccomp 过滤模式补丁应用后校验失败 (lsm_hook.c)"
-    # 聚合编译文件随上游重构更名（kernel/ksu.c -> kernel/ksu_main.c），按实际路径校验
+      || fail "Validation failed after applying the seccomp filtering-mode patch (lsm_hook.c)"
+    # The aggregate source file was renamed upstream (kernel/ksu.c -> kernel/ksu_main.c); validate the actual path
     KSU_AGG=""
     for cand in kernel/ksu.c kernel/ksu_main.c; do
       if [ -f "$KSU_DIR/$cand" ]; then
@@ -96,22 +96,22 @@ if [ -f "$LSM_FILE" ] && grep -q 'handle_zygote_setresuid' "$LSM_FILE"; then
       fi
     done
     if [ -z "$KSU_AGG" ] || ! grep -q '#include "infra/seccomp_cache.c"' "$KSU_AGG"; then
-      fail "seccomp 过滤模式补丁应用后校验失败 (聚合编译文件 ksu.c/ksu_main.c)"
+      fail "Validation failed after applying the seccomp filtering-mode patch (aggregate source file ksu.c/ksu_main.c)"
     fi
     grep -q '#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)' "$KSU_DIR/kernel/infra/seccomp_cache.c" \
-      || fail "seccomp_cache.c 版本守卫校验失败"
-    echo "seccomp 过滤模式已启用：管理器首页 Seccomp 状态将显示\"过滤模式\""
+      || fail "seccomp_cache.c version guard validation failed"
+    echo "Seccomp filtering mode enabled: the manager's Seccomp status will show \"Filtering mode\""
   fi
 else
-  echo "lsm_hook.c 无 builtin setresuid 路径（main 分支已内置过滤模式），跳过 seccomp 过滤模式补丁"
+  echo "lsm_hook.c has no builtin setresuid path (the main branch already includes filtering mode); skipping the seccomp filtering-mode patch"
 fi
 
 # ---- clang fall-through annotation ----
-# builtin 的 policy/allowlist.c 使用注释形式 fall-through；bazel GKI
-# 构建开启 -Werror,-Wimplicit-fallthrough 时会直接报错。改用内核
-# fallthrough 宏（展开为 __attribute__((__fallthrough__))），上游修复后自动跳过。
+# The builtin policy/allowlist.c uses comment-style fall-through; Bazel GKI
+# builds with -Werror,-Wimplicit-fallthrough fail. Replace it with the kernel's
+# fallthrough macro (expands to __attribute__((__fallthrough__))) and skip automatically after an upstream fix.
 if grep -rqF '/* fall through */' "$KSU_DIR/kernel" 2>/dev/null; then
-  echo "修正 SukiSU 源码的注释式 fall-through（bazel -Werror 兼容）..."
+  echo "Fixing comment-style fall-through in SukiSU source (Bazel -Werror compatibility)..."
   python3 - "$KSU_DIR" <<'PYEOF'
 import pathlib
 import sys
@@ -129,11 +129,11 @@ for path in sorted(root.rglob("*.c")):
     print(f"  {path}")
 PYEOF
   if grep -rqF '/* fall through */' "$KSU_DIR/kernel" 2>/dev/null; then
-    fail "fall-through 注解修正后仍有残留"
+    fail "fall-through annotation remains after the fix"
   fi
-  echo "fall-through 注解修正完成"
+  echo "fall-through annotation fix complete"
 else
-  echo "SukiSU 源码无注释式 fall-through，跳过"
+  echo "No comment-style fall-through in SukiSU source; skipping"
 fi
 
-echo "SukiSU API 兼容补丁处理完成"
+echo "SukiSU API compatibility patch processing complete"
