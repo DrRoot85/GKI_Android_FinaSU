@@ -1,0 +1,65 @@
+name: Update GKI Kernel Data
+
+on:
+  schedule:
+    - cron: '0 8 */3 * *'  # Every 3 days at 08:00 UTC
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'data/**'
+      - 'scripts/**'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+jobs:
+  update-data:
+    runs-on: ubuntu-24.04
+    steps:
+      # GITHUB_TOKEN can never push .github/workflows changes (the official docs do not provide the
+      # workflow scope, to prevent Actions from modifying themselves); a PAT secret with the workflow
+      # permission must be used to push; when it is not configured, fall back to GITHUB_TOKEN (still works when only pushing
+      # non-workflow files such as data/).
+      - uses: actions/checkout@v7
+        with:
+          token: ${{ secrets.WORKFLOW_PUSH_TOKEN || github.token }}
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Run incremental update
+        working-directory: scripts
+        run: |
+          # Exit 0 = data changed, 2 = no changes, 1 = real error
+          python update_data.py && exit_code=0 || exit_code=$?
+          if [ $exit_code -eq 1 ]; then
+            echo "::error::update_data.py failed with an error"
+            exit 1
+          fi
+
+      - name: Refresh custom workflow choices
+        working-directory: scripts
+        run: python update_workflow_choices.py
+
+      - name: Commit data changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/ .github/workflows/kernel-custom.yml \
+            .github/workflows/kernel-a12-5-10.yml .github/workflows/kernel-a13-5-10.yml \
+            .github/workflows/kernel-a13-5-15.yml .github/workflows/kernel-a14-5-15.yml \
+            .github/workflows/kernel-a14-6-1.yml .github/workflows/kernel-a15-6-6.yml \
+            .github/workflows/kernel-a16-6-12.yml .github/workflows/kernel-a17-6-18.yml
+          if git diff --cached --quiet; then
+            echo "No data changes to commit."
+          else
+            git commit -m "chore: update GKI kernel version data"
+            git pull --rebase --autostash origin main
+            git push
+          fi

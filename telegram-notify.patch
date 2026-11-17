@@ -1,0 +1,47 @@
+diff --git a/.github/workflows/main.yml b/.github/workflows/main.yml
+index d2764df..46963f4 100644
+--- a/.github/workflows/main.yml
++++ b/.github/workflows/main.yml
+@@ -1023,3 +1023,42 @@ jobs:
+           echo "- **Tag**: $NEW_TAG" >> $GITHUB_STEP_SUMMARY
+           echo "- **Type**: ${{ inputs.release_type }}" >> $GITHUB_STEP_SUMMARY
+           echo "- **Link**: https://github.com/$REPO_OWNER/$REPO_NAME/releases/tag/$NEW_TAG" >> $GITHUB_STEP_SUMMARY
++
++      # ==================== Telegram notification ====================
++      # Requires the repository secrets TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID.
++      # Runs inside this job (not on the `release` event), because releases created with the
++      # default GITHUB_TOKEN do not trigger other workflows.
++      - name: Notify Telegram
++        if: ${{ always() && env.NEW_TAG != '' }}
++        continue-on-error: true
++        env:
++          TG_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
++          TG_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
++        run: |
++          if [ -z "$TG_BOT_TOKEN" ] || [ -z "$TG_CHAT_ID" ]; then
++            echo "::notice::TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID not set; skipping Telegram notification"
++            exit 0
++          fi
++          if ! gh release view "$NEW_TAG" > /dev/null 2>&1; then
++            echo "::warning::Release $NEW_TAG does not exist; skipping Telegram notification"
++            exit 0
++          fi
++
++          esc() { sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
++          RELEASE_NAME=$(gh release view "$NEW_TAG" --json name --jq '.name' | esc)
++          RELEASE_URL="https://github.com/$REPO_OWNER/$REPO_NAME/releases/tag/$NEW_TAG"
++
++          TEXT=$(printf '📦 <b>New release</b>\n\n<b>%s</b>\nTag: <code>%s</code>\nType: %s\n\n<a href="%s">Open on GitHub</a>' \
++            "$RELEASE_NAME" "$NEW_TAG" "${{ inputs.release_type }}" "$RELEASE_URL")
++
++          RESPONSE=$(curl -sS -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
++            --data-urlencode "chat_id=${TG_CHAT_ID}" \
++            --data-urlencode "text=${TEXT}" \
++            --data-urlencode "parse_mode=HTML" \
++            --data-urlencode "disable_web_page_preview=false" || true)
++
++          if echo "$RESPONSE" | grep -q '"ok":true'; then
++            echo "Telegram notification sent for $NEW_TAG"
++          else
++            echo "::warning::Telegram notification failed: $(echo "$RESPONSE" | head -c 300)"
++          fi
