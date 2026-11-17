@@ -417,7 +417,7 @@ fi
 # 4b) All kernels: callers of the priority UID filter helpers in susfs.c are protected by #ifdef,
 #     but the definitions are not; without CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER, they are unreferenced and
 #     trigger clang -Werror,-Wunused-function. Guard the definitions with the same #ifdef.
-# 注意：此时已 cd 到 $KERNEL_ROOT/common，路径用 $PWD/... 而非 $PWD/common/...
+# Note: the working directory is already $KERNEL_ROOT/common; use $PWD/... instead of $PWD/common/....
 if [ -f fs/susfs.c ]; then
   echo "Applying susfs_guard_priority_helpers.py (guard priority UID filter helpers)"
   python3 "$SCRIPT_DIR/susfs_guard_priority_helpers.py" "$PWD/fs/susfs.c"
@@ -614,32 +614,32 @@ sed(hk, "rm_early(<6.6)", r"\terror = avc_has_perm\(&selinux_state,\n\t\t\t\t   
 sed(hk, "rm_early(>=6.6)", r"\terror = avc_has_perm\(mysid, mysid, SECCLASS_PROCESS,\n\t\t\t\t     PROCESS__SETCURRENT, NULL\);\n\n\tif \(error\)\n\t\treturn error;\n\n", "")
 # Check SETCURRENT only if backup parsing fails, and synchronize the global sidtab.
 sed(hk, "seq+sync(<6.6)", r"(\t\terror = security_context_to_sid\(&fake_state, value, size,\n\t\t\t\t\t\t&sid, GFP_KERNEL\);\n)\t\tif \(error\)\n\t\t\treturn error;\n",
-    "\\1\t\tif (error) {\n\t\t\t/* FINASU_SEQ: 仅当 backup 解析失败时才做 SETCURRENT 检查（KernelSU df03912f） */\n\t\t\tint perm_error = avc_has_perm(&selinux_state, mysid, mysid, SECCLASS_PROCESS, PROCESS__SETCURRENT, NULL);\n\t\t\treturn perm_error ?: error;\n\t\t}\n\t\t{\n\t\t\tu32 tmp_sid;\n\t\t\t/* FINASU_SIDTAB_SYNC (KernelSU #3873) */\n\t\t\tsecurity_context_to_sid(&selinux_state, value, size, &tmp_sid, GFP_KERNEL);\n\t\t}\n")
+    "\\1\t\tif (error) {\n\t\t\t/* FINASU_SEQ: check SETCURRENT only when backup parsing fails (KernelSU df03912f) */\n\t\t\tint perm_error = avc_has_perm(&selinux_state, mysid, mysid, SECCLASS_PROCESS, PROCESS__SETCURRENT, NULL);\n\t\t\treturn perm_error ?: error;\n\t\t}\n\t\t{\n\t\t\tu32 tmp_sid;\n\t\t\t/* FINASU_SIDTAB_SYNC (KernelSU #3873) */\n\t\t\tsecurity_context_to_sid(&selinux_state, value, size, &tmp_sid, GFP_KERNEL);\n\t\t}\n")
 sed(hk, "seq+sync(>=6.6)", r"(\t\terror = security_context_to_sid_with_policy\(backup_sepolicy, str, size, &sid, SECSID_NULL, GFP_KERNEL\);\n)\t\tif \(error\)\n\t\t\treturn error;\n",
-    "\\1\t\tif (error) {\n\t\t\t/* FINASU_SEQ: 仅当 backup 解析失败时才做 SETCURRENT 检查（KernelSU df03912f） */\n\t\t\tint perm_error = avc_has_perm(mysid, mysid, SECCLASS_PROCESS, PROCESS__SETCURRENT, NULL);\n\t\t\treturn perm_error ?: error;\n\t\t}\n\t\t{\n\t\t\tu32 tmp_sid;\n\t\t\t/* FINASU_SIDTAB_SYNC (KernelSU #3873) */\n\t\t\tsecurity_context_to_sid(str, size, &tmp_sid, GFP_KERNEL);\n\t\t}\n")
+    "\\1\t\tif (error) {\n\t\t\t/* FINASU_SEQ: check SETCURRENT only when backup parsing fails (KernelSU df03912f) */\n\t\t\tint perm_error = avc_has_perm(mysid, mysid, SECCLASS_PROCESS, PROCESS__SETCURRENT, NULL);\n\t\t\treturn perm_error ?: error;\n\t\t}\n\t\t{\n\t\t\tu32 tmp_sid;\n\t\t\t/* FINASU_SIDTAB_SYNC (KernelSU #3873) */\n\t\t\tsecurity_context_to_sid(str, size, &tmp_sid, GFP_KERNEL);\n\t\t}\n")
 PYEOF
-  # 仅作信息输出；旧形态模式部分失配时 grep 无命中，必须 || true，否则 pipefail 会中断整个补丁步骤
+  # Informational output only: grep may find no matches if the old pattern does not apply; || true prevents pipefail from aborting the patch step.
   grep -n 'FINASU_SIDTAB_SYNC' security/selinux/selinuxfs.c | head || true
   grep -n 'FINASU_SIDTAB_SYNC\|FINASU_SEQ' security/selinux/hooks.c | head || true
 else
-  # 主补丁形态判定：
-  #   旧形态定义 my_write_context/my_write_access/my_setprocattr，缺失即异常，保留告警；
-  #   现行形态（2026-10 起的主补丁）不再定义这三个函数：<6.6 内联改 selinux_setprocattr /
-  #   selinuxfs 调用点（should_check_current+fake_error 门控），>=6.6 用 backup_sepolicy +
-  #   my_security_context_to_sid（内核侧自含）。侧信道修复（sidtab 同步 #3873、权限顺序
-  #   df03912f）由 NEW_MODEL 分支的 8 参 _with_policy 转换与门控校验覆盖，无需旧形态移植。
+  # Determine the main-patch layout:
+  #   The old layout defines my_write_context/my_write_access/my_setprocattr; if they are missing, retain the warning because this is unexpected.
+  #   The current layout (main patches since 2026-10) no longer defines these functions: before 6.6 it modifies selinux_setprocattr inline /
+  #   the selinuxfs call site (should_check_current+fake_error gating); on 6.6 and later it uses backup_sepolicy +
+  #   my_security_context_to_sid (self-contained in the kernel). Side-channel fixes (sidtab synchronization #3873 and permission ordering
+  #   df03912f) are covered by the NEW_MODEL branch's 8-argument _with_policy conversion and gating checks; no old-layout backport is needed.
   if grep -qE 'static ssize_t my_write_(context|access)' security/selinux/selinuxfs.c 2>/dev/null \
     || grep -q 'static int my_setprocattr' security/selinux/hooks.c 2>/dev/null; then
-    echo "::warning::未找到 SUSFS 的 my_write_context/my_setprocattr，跳过 SELinux 侧信道移植"
+    echo "::warning::SUSFS my_write_context/my_setprocattr were not found; skipping the SELinux side-channel backport"
   else
-    echo "SUSFS 主补丁为现行形态（无 my_write_context/my_setprocattr）：侧信道修复由门控校验与 8 参 _with_policy 内置同步覆盖，无需旧形态移植"
+    echo "The SUSFS main patch uses the current layout (no my_write_context/my_setprocattr): gating checks and built-in synchronization in the 8-argument _with_policy call cover the side-channel fixes; no old-layout backport is needed"
   fi
 fi
 
-# ==================== SUSFS 路径隐藏回退（跨命名空间 / FUSE） ====================
-# susfs_add_sus_path（非 loop）在“调用方命名空间”里 kern_path 解析路径；管理器/ksud 常解析不到
-# /storage/emulated 这类 FUSE 路径（-ENOENT），于是规则加不进去、路径隐藏失效。
-# 这里加回退：解析失败时自动改走 LOOP 机制（内核 workqueue 在 init 命名空间稍后解析并打标记）。
+# ==================== SUSFS path-hiding fallback (across namespaces / FUSE) ====================
+# susfs_add_sus_path (non-loop) resolves paths with kern_path in the caller's namespace; the manager/ksud often cannot resolve
+# FUSE paths such as /storage/emulated (-ENOENT), so the rule cannot be added and path hiding fails.
+# Add a fallback: if resolution fails, use the LOOP mechanism, which resolves the path later in the init namespace via a kernel workqueue and marks it.
 if [ -f fs/susfs.c ] && grep -qF 'void susfs_add_sus_path(void __user **user_info)' fs/susfs.c \
   && ! grep -qF 'FINASU_SUS_PATH_LOOP_FALLBACK' fs/susfs.c; then
   python3 - <<'PYEOF'
@@ -648,7 +648,7 @@ s = open(p, encoding="utf-8", errors="surrogateescape").read()
 old1 = "void susfs_add_sus_path(void __user **user_info) {"
 new1 = "void susfs_add_sus_path_loop(void __user **user_info);\n" + old1
 if s.count(old1) != 1:
-    print("::warning::fs/susfs.c: susfs_add_sus_path 签名不是预期形态，跳过")
+    print("::warning::fs/susfs.c: susfs_add_sus_path signature has an unexpected form; skipping")
 else:
     s = s.replace(old1, new1, 1)
     old2 = ("\tif (copy_from_user(&info, (struct st_susfs_sus_path __user*)*user_info, sizeof(info))) {\n"
@@ -667,74 +667,74 @@ else:
             "\tinfo.err = kern_path(info.target_pathname, LOOKUP_FOLLOW, &path);\n"
             "\tif (info.err) {\n"
             "\t\tSUSFS_LOGE(\"failed opening '%s' in current ns, fallback to sus_path_loop\\n\", info.target_pathname);\n"
-            "\t\t/* FINASU_SUS_PATH_LOOP_FALLBACK: 调用方命名空间解析不到（常见于 /storage/emulated 等 FUSE 路径）时，\n"
-            "\t\t   退回 LOOP 机制，交由内核 workqueue 在 init 命名空间稍后解析并重新打标记 */\n"
+            "\t\t/* FINASU_SUS_PATH_LOOP_FALLBACK: when the caller's namespace cannot resolve the path (common for FUSE paths such as /storage/emulated), \n"
+            "\t\t   fall back to the LOOP mechanism; a kernel workqueue will resolve it later in the init namespace and mark it again */\n"
             "\t\tsusfs_add_sus_path_loop(user_info);\n"
             "\t\treturn;\n"
             "\t}\n")
     if s.count(old2) != 1:
-        print("::warning::fs/susfs.c: susfs_add_sus_path 代码形态不是预期，跳过回退")
+        print("::warning::fs/susfs.c: susfs_add_sus_path code has an unexpected form; skipping the fallback")
     else:
         open(p, "w", encoding="utf-8", errors="surrogateescape").write(s.replace(old2, new2, 1))
-        print("fs/susfs.c: 已加 SUSFS 路径隐藏 LOOP 回退")
+        print("fs/susfs.c: Added the SUSFS path-hiding LOOP fallback")
 PYEOF
   grep -n 'FINASU_SUS_PATH_LOOP_FALLBACK' fs/susfs.c | head
 else
-  echo "::warning::未找到 fs/susfs.c 的 susfs_add_sus_path，跳过路径隐藏回退"
+  echo "::warning::Could not find susfs_add_sus_path in fs/susfs.c; skipping the path-hiding fallback"
 fi
 
 
-# ---- 预期冲突处理：上游已包含同款修改的 .rej 剔除，真实缺失的手工补齐 ----
+# ---- Handle expected conflicts: remove .rej files for changes already present upstream, and manually add genuinely missing changes ----
 
-# 1) fs/unicode：ASB 内核已包含上游 "unicode: don't special case ignorable code
-#    points" 提交，主补丁删除 ignore_init / 重生成 utf8data 的 hunk 已天然满足
+# 1) fs/unicode: ASB kernels already include the upstream "unicode: don't special case ignorable code
+#    points" commit, so the main patch's hunk that removes ignore_init / regenerates utf8data is already satisfied
 if [[ -f fs/unicode/mkutf8data.c.rej ]] && ! grep -q 'ignore_init' fs/unicode/mkutf8data.c; then
-  echo "fs/unicode .rej 为上游已包含同款修改，剔除预期冲突文件"
+  echo "fs/unicode .rej contains a change already present upstream; removing the expected conflict file"
   rm -f fs/unicode/*.rej
 fi
 
-# 2) mm/rmap.c：6.6.127+ 已包含 huge_pmd_unshare 的 tlb 化改造
+# 2) mm/rmap.c: 6.6.127 and later already contain the TLB conversion for huge_pmd_unshare
 if [[ -f mm/rmap.c.rej ]] && grep -q 'tlb_gather_mmu_vma' mm/rmap.c; then
-  echo "mm/rmap.c .rej 为上游已包含同款修改，剔除预期冲突文件"
+  echo "mm/rmap.c .rej contains a change already present upstream; removing the expected conflict file"
   rm -f mm/rmap.c.rej
 fi
 
-# 3) fs/proc/task_mmu.c（6.12.69+）：show_smap 重构（vma_pages → vma_data_pages）
-#    导致 SUS_MAP 检查 hunk 上下文失配被拒，属于真实缺失，手工补回
+# 3) fs/proc/task_mmu.c (6.12.69+): show_smap was refactored (vma_pages → vma_data_pages)
+#    causing the SUS_MAP check hunk to be rejected due to a context mismatch; it is genuinely missing, so add it manually
 if [[ -f fs/proc/task_mmu.c.rej ]] \
   && grep -qF 'static int show_smap(struct seq_file *m, void *v)' fs/proc/task_mmu.c; then
   SHOW_SMAP_BODY="$(sed -n '/^static int show_smap(struct seq_file \*m, void \*v)/,/^}/p' fs/proc/task_mmu.c)"
   if [[ -n "$SHOW_SMAP_BODY" ]] && ! grep -qF 'SUSFS_IS_INODE_SUS_MAP' <<< "$SHOW_SMAP_BODY"; then
-    echo "为 show_smap 手工补入 SUS_MAP 检查（6.12.69+ 上下文漂移）"
+    echo "Manually adding the SUS_MAP check to show_smap (6.12.69+ context drift)"
     perl -0pi -e 's/(static int show_smap\(struct seq_file \*m, void \*v\)\n\{\n\tstruct vm_area_struct \*vma = v;\n\tstruct mem_size_stats mss = \{\};\n)/$1\n#ifdef CONFIG_KSU_SUSFS_SUS_MAP\n\tif (vma->vm_file) {\n\t\tif (SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))\n\t\t\treturn 0;\n\t}\n#endif \/\/ #ifdef CONFIG_KSU_SUSFS_SUS_MAP\n/' fs/proc/task_mmu.c
     if ! grep -qF 'SUSFS_IS_INODE_SUS_MAP' fs/proc/task_mmu.c; then
-      echo "::error::show_smap SUS_MAP 检查手工补丁失败，请人工核对 fs/proc/task_mmu.c"
+      echo "::error::Failed to manually patch the show_smap SUS_MAP check; inspect fs/proc/task_mmu.c"
       exit 1
     fi
   fi
 
-  # 同一个文件在 6.12.69+ 还把 show_smaps_rollup 重写成 VMA_ITERATOR + for_each_vma
-  # （删掉了 out_unlock 分支），主补丁那两段 hunk 依赖旧上下文全部被拒；虽然不影响
-  # 编译，但 SUS_MAP 标记的 VMA 会经 /proc/<pid>/smaps_rollup 泄露。这里在 do 循环
-  # 入口整段跳过该 VMA，并同步 last_vma_end，语义与主补丁的 bypass_orig_flow 一致。
+  # In 6.12.69+, the same file also rewrites show_smaps_rollup to use VMA_ITERATOR + for_each_vma
+  # (removing the out_unlock branch), so both main-patch hunks that depend on the old context are rejected; although this does not affect
+  # compilation, SUS_MAP-marked VMAs would be exposed through /proc/<pid>/smaps_rollup. Skip them at the do-loop
+  # entry and update last_vma_end, matching the main patch's bypass_orig_flow behavior.
   if grep -qF 'bypass_orig_flow' fs/proc/task_mmu.c.rej \
     && ! sed -n '/^static int show_smaps_rollup(struct seq_file \*m, void \*v)/,/^}/p' fs/proc/task_mmu.c \
       | grep -qF 'SUSFS_IS_INODE_SUS_MAP'; then
-    echo "为 show_smaps_rollup 手工补入 SUS_MAP 跳过逻辑（6.12.69+ 上下文漂移）"
+    echo "Manually adding SUS_MAP skip logic to show_smaps_rollup (6.12.69+ context drift)"
     python3 - <<'PYEOF'
 p = "fs/proc/task_mmu.c"
 s = open(p, encoding="utf-8", errors="surrogateescape").read()
 start = s.find("static int show_smaps_rollup(struct seq_file *m, void *v)")
 end = s.find("\n}\n", start)
 if start < 0 or end < 0:
-    print("::error::fs/proc/task_mmu.c: 未找到 show_smaps_rollup")
+    print("::error::fs/proc/task_mmu.c: show_smaps_rollup was not found")
     raise SystemExit(1)
 body = s[start:end]
 needle = "\tdo {\n\t\tsmap_gather_stats(vma, &mss, 0);\n"
 insert = (
     "\tdo {\n"
     "#ifdef CONFIG_KSU_SUSFS_SUS_MAP\n"
-    "\t\t/* SUS_MAP 标记的 VMA 整体跳过，避免 rollup 中泄露 */\n"
+    "\t\t/* Skip the entire SUS_MAP-marked VMA to prevent it from appearing in the rollup */\n"
     "\t\tif (vma->vm_file && SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file))) {\n"
     "\t\t\tlast_vma_end = vma->vm_end;\n"
     "\t\t\tcontinue;\n"
@@ -743,23 +743,23 @@ insert = (
     "\t\tsmap_gather_stats(vma, &mss, 0);\n"
 )
 if "SUSFS_IS_INODE_SUS_MAP" in body:
-    print("show_smaps_rollup 已含 SUS_MAP 检查，跳过")
+    print("show_smaps_rollup already contains the SUS_MAP check; skipping")
 elif body.count(needle) != 1:
-    print("::error::show_smaps_rollup 循环入口形态不是预期，跳过")
+    print("::error::show_smaps_rollup loop entry has an unexpected form; skipping")
     raise SystemExit(1)
 else:
     s = s[:start] + body.replace(needle, insert, 1) + s[end:]
     open(p, "w", encoding="utf-8", errors="surrogateescape").write(s)
-    print("show_smaps_rollup: 已补入 SUS_MAP 跳过逻辑")
+    print("show_smaps_rollup: added SUS_MAP skip logic")
 PYEOF
     if ! sed -n '/^static int show_smaps_rollup(struct seq_file \*m, void \*v)/,/^}/p' fs/proc/task_mmu.c \
       | grep -qF 'SUSFS_IS_INODE_SUS_MAP'; then
-      echo "::error::show_smaps_rollup SUS_MAP 跳过逻辑手工补丁失败，请人工核对 fs/proc/task_mmu.c"
+      echo "::error::Failed to manually patch show_smaps_rollup SUS_MAP skip logic; inspect fs/proc/task_mmu.c"
       exit 1
     fi
   fi
 
-  # 拒绝内容已全部补齐，删除 .rej，避免继续污染 Rejects 产物
+  # All rejected changes have been addressed; remove .rej to keep them out of the Rejects artifact.
   TASK_MMU_UNRESOLVED=0
   if grep -qF 'bypass_orig_flow' fs/proc/task_mmu.c.rej \
     && ! sed -n '/^static int show_smaps_rollup(struct seq_file \*m, void \*v)/,/^}/p' fs/proc/task_mmu.c \
@@ -772,62 +772,62 @@ PYEOF
     TASK_MMU_UNRESOLVED=1
   fi
   if [[ "$TASK_MMU_UNRESOLVED" -eq 0 ]]; then
-    # 仅当拒绝内容全部落在已处理的两个函数上时才删除，避免掩盖新出现的漂移
+    # Remove the file only if all rejected hunks belong to the two functions already handled, so new upstream drift is not hidden.
     UNKNOWN_HUNK="$(grep '^@@' fs/proc/task_mmu.c.rej | grep -vE 'show_smap|show_smaps_rollup' || true)"
     if [[ -z "$UNKNOWN_HUNK" ]]; then
-      echo "fs/proc/task_mmu.c 拒绝内容已全部补齐，剔除 .rej"
+      echo "All rejected changes in fs/proc/task_mmu.c have been addressed; removing the .rej file"
       rm -f fs/proc/task_mmu.c.rej
     else
-      echo "::warning title=task_mmu 冲突::仍有未识别的 hunk，保留 .rej 供排查："
+      echo "::warning title=task_mmu conflict::Unrecognized hunks remain; keeping the .rej file for investigation:"
       echo "$UNKNOWN_HUNK"
     fi
   fi
 fi
 
-# 上游 5.10 主补丁把 susfs_sus_kstat_spoof_vfs_statfs 的 extern 声明放在了
-# fs/statfs.c 的使用点之后（vfs_statfs 之前），clang -Werror 报隐式声明；
-# 声明属于 SUSFS 接口，直接补进公共头 include/linux/susfs_def.h：
-# 不依赖 statfs.c 内锚点与行号比较，声明重复合法，上游后续自行修复也不冲突。
-# 注意：FinaSU 的 setuid_hook.c / sucompat.c 会在仅有 <linux/types.h> 等基础
-# 头文件时就包含 susfs_def.h，此时 struct kstatfs 尚未声明，原型内引入新
-# struct 标签会触发 clang -Werror,-Wvisibility（上游内核构建日志实证），
-# 因此必须连同 struct 前置声明一起插入。
+# The upstream 5.10 main patch places the extern declaration for susfs_sus_kstat_spoof_vfs_statfs
+# after its use in fs/statfs.c (before vfs_statfs), causing clang -Werror to report an implicit declaration.
+# This declaration is part of the SUSFS interface; add it directly to the public header include/linux/susfs_def.h:
+# This avoids relying on anchors or line-number comparisons in statfs.c; duplicate declarations are valid and will not conflict if upstream fixes this later.
+# Note: FinaSU's setuid_hook.c / sucompat.c may include susfs_def.h with only basic headers such as <linux/types.h>
+# included; at that point struct kstatfs is not yet declared, and introducing a new struct tag in the prototype
+# triggers clang -Werror,-Wvisibility (as confirmed by upstream kernel build logs),
+# so add the struct forward declarations at the same time.
 SUSFS_DEF_H="$KERNEL_ROOT/common/include/linux/susfs_def.h"
 if [[ -f fs/statfs.c ]] && grep -qF 'susfs_sus_kstat_spoof_vfs_statfs(' fs/statfs.c \
   && [[ -f "$SUSFS_DEF_H" ]] \
   && ! grep -qF 'susfs_sus_kstat_spoof_vfs_statfs(' "$SUSFS_DEF_H"; then
-  echo "将 susfs_sus_kstat_spoof_vfs_statfs 声明补入 include/linux/susfs_def.h"
+  echo "Adding the susfs_sus_kstat_spoof_vfs_statfs declaration to include/linux/susfs_def.h"
   sed -i '/^#endif \/\/ #ifndef KSU_SUSFS_DEF_H$/i struct inode;\nstruct kstatfs;\nextern int susfs_sus_kstat_spoof_vfs_statfs(struct inode *inode, struct kstatfs *buf, bool *is_fuse);' "$SUSFS_DEF_H"
 fi
 
-# 在编译前报告 SUSFS 主补丁产生的冲突文件，上游自带的已提交 .rej 不计入
+# Report conflicts created by the SUSFS main patch before compiling; committed upstream .rej files are not counted.
 mapfile -t SUSFS_REJ_FILES < <(list_untracked_rej)
 SUSFS_REJ_COUNT=${#SUSFS_REJ_FILES[@]}
 if [ "$SUSFS_REJ_COUNT" -gt 0 ]; then
-  echo "::warning title=SUSFS 补丁冲突::SUSFS 主补丁产生了 ${SUSFS_REJ_COUNT} 个 .rej 冲突文件，可能导致后续编译失败（详见 Rejects 产物）"
+  echo "::warning title=SUSFS patch conflicts::The SUSFS main patch produced ${SUSFS_REJ_COUNT} .rej conflict files, which may cause compilation to fail (see the Rejects artifact)"
   printf '%s\n' "${SUSFS_REJ_FILES[@]}"
 fi
 
-# 还原仅用于补丁匹配的临时源码调整
+# Restore temporary source changes used only for patch matching.
 if [[ "$ANDROID_VERSION" == "android12" && "$KERNEL_VERSION" == "5.10" ]]; then
   if [[ -n "$LEGACY_SUKISU_CONFIG" && "$CURRENT_SUB" -le 43 ]]; then
-    echo "还原 Android 12 5.10 base.c 临时调整"
+    echo "Restoring temporary Android 12 5.10 base.c changes"
     sed -i 's/^size_t this_len = min_t(size_t, count, PAGE_SIZE);$/int this_len = min_t(int, count, PAGE_SIZE);/' fs/proc/base.c
   fi
   if [[ "$CURRENT_SUB" -le 117 ]]; then
-    echo "还原 Android 12 5.10 fdinfo.c 临时调整"
+    echo "Restoring temporary Android 12 5.10 fdinfo.c changes"
     restore_legacy_fdinfo_context
   fi
 fi
 
 if [[ "$ANDROID_VERSION" == "android13" && "$KERNEL_VERSION" == "5.10" && "$CURRENT_SUB" -le 107 ]]; then
-  echo "还原 Android 13 5.10 fdinfo.c 临时调整"
+  echo "Restoring temporary Android 13 5.10 fdinfo.c changes"
   restore_legacy_fdinfo_context
 fi
 
 if [[ "$ANDROID_VERSION" == "android13" && "$KERNEL_VERSION" == "5.15" ]]; then
   if [[ "$CURRENT_SUB" -le 41 ]]; then
-    echo "还原 Android 13 5.15 临时调整"
+    echo "Restoring temporary Android 13 5.15 changes"
     sed -i '/#include <linux\/mnt_idmapping.h>$/d' fs/namespace.c
     sed -i '/#include <linux\/mnt_idmapping.h>$/d' fs/open.c
     restore_legacy_fdinfo_context
@@ -835,7 +835,7 @@ if [[ "$ANDROID_VERSION" == "android13" && "$KERNEL_VERSION" == "5.15" ]]; then
     sed -i 's|i_uid_into_mnt(i_user_ns(inode), inode).val|i_uid_into_mnt(\&init_user_ns, inode).val|g' fs/susfs.c
   fi
   if [[ "$OS_PATCH_LEVEL" == "lts" ]]; then
-    echo "还原 Android 13 5.15 LTS 头文件上下文"
+    echo "Restoring the Android 13 5.15 LTS header context"
     if ! grep -qF '#include <trace/hooks/blk.h>' fs/namespace.c; then
       sed -i '/^#include "internal.h"$/a #include <trace/hooks/blk.h>' fs/namespace.c
     fi
@@ -850,37 +850,37 @@ if [[ "$ANDROID_VERSION" == "android14" && "$KERNEL_VERSION" == "6.1" ]]; then
     sed -i '/^#include <trace\/hooks\/sched.h>$/d' fs/proc/base.c
   fi
   if [[ "$CURRENT_SUB" -le 141 ]]; then
-    echo "还原 Android 14 6.1 base.c 临时调整"
+    echo "Restoring temporary Android 14 6.1 base.c changes"
     sed -i '/^#include <linux\/dma-buf.h>$/d' fs/proc/base.c
   fi
   if [[ "$CURRENT_SUB" -ge 157 ]] && ! grep -qF '#include <trace/hooks/blk.h>' fs/namespace.c; then
-    echo "还原 Android 14 6.1 namespace.c 临时调整"
+    echo "Restoring temporary Android 14 6.1 namespace.c changes"
     sed -i '/^#include "internal.h"$/a #include <trace/hooks/blk.h>' fs/namespace.c
   fi
 fi
 
 if [[ "$ANDROID_VERSION" == "android15" && "$KERNEL_VERSION" == "6.6" ]]; then
   if [[ "$CURRENT_SUB" -le 92 ]]; then
-    echo "还原 Android 15 6.6 base.c 临时调整"
+    echo "Restoring temporary Android 15 6.6 base.c changes"
     sed -i '/^#include <linux\/dma-buf.h>$/d' fs/proc/base.c
   fi
   if [[ "$CURRENT_SUB" -le 57 ]]; then
-    echo "还原 Android 15 6.6 memory.c 临时调整"
+    echo "Restoring temporary Android 15 6.6 memory.c changes"
     sed -i '/^#include <linux\/zswap.h>$/d' mm/memory.c
   fi
 fi
 
 fix_missing_vm_flags_clear() {
-  # Google 2024-11 及更新的 deprecated 分支带入了 16KB 页迁移的 VMA padding：
-  # mm/mmap.c 的 copy_vma() 调用 vm_flags_clear()，但同分支 include/linux 未
-  # 提供该（6.3+ 才引入的）helper，clang -Werror 报隐式声明中断编译。
-  # 按源码内容检测：helper 齐备（6.6+ 原生）或无调用时自动跳过，
-  # 不再按 OS_PATCH_LEVEL 猜测命中范围（android13-5.10 / android14-5.15 的
-  # 2024-11 分支与 android12-5.10 / android13-5.15 同样命中）。
+  # Google's 2024-11 and later deprecated branches include VMA padding for the 16 KB page migration:
+  # copy_vma() in mm/mmap.c calls vm_flags_clear(), but include/linux in the same branch does not
+  # provide this helper (introduced in 6.3), so clang -Werror reports an implicit declaration and stops compilation.
+  # Detect based on source contents: skip automatically if the helper exists (native in 6.6+) or is not called.
+  # Do not infer affected versions from OS_PATCH_LEVEL (the 2024-11 branches of android13-5.10 / android14-5.15
+  # are affected just like android12-5.10 / android13-5.15).
   if grep -qF 'vm_flags_clear(new_vma, VM_PAD_MASK);' ./mm/mmap.c \
     && ! grep -Rqs 'vm_flags_clear' ./include/linux; then
     sed -i 's/vm_flags_clear(new_vma, VM_PAD_MASK);/new_vma->vm_flags \&= ~VM_PAD_MASK;/' ./mm/mmap.c
-    echo "已替换 mm/mmap.c 缺失 helper 的 vm_flags_clear 调用（VMA padding 半回移兼容）"
+    echo "Replaced vm_flags_clear calls in mm/mmap.c that lacked a helper (partial backport compatibility for VMA padding)"
   fi
 }
 
@@ -888,74 +888,74 @@ fix_task_mmu_show_pad() {
   local max_sub="$1"
   local excluded_patch_level="${2:-}"
 
-  # 仅固定旧版 SUSFS 补丁会引入 goto show_pad，最新版已不再包含该代码
+  # Only older fixed SUSFS patches introduce goto show_pad; the latest version no longer contains this code
   if [[ -n "$LEGACY_SUKISU_CONFIG" && "$CURRENT_SUB" -le "$max_sub" ]] \
     && { [[ -z "$excluded_patch_level" ]] || [[ "$OS_PATCH_LEVEL" != "$excluded_patch_level" ]]; }; then
     sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
   fi
 }
 
-# mmap.c 的 vm_flags_clear 半回移修复对所有内核统一按内容检测（函数内部自带
-# 守卫，helper 齐备或无调用时为空操作），覆盖各 android 版本 2024-11 起
-# 持续更新的 deprecated 分支
+# Apply the vm_flags_clear partial-backport fix to all kernels using content-based detection (the function itself includes
+# guards, so this is a no-op when the helper exists or is unused), covering Android branches updated since 2024-11
+# across continuously updated deprecated branches.
 fix_missing_vm_flags_clear
 
-# Android 12 - 5.10 修复
+# Android 12 - 5.10 fixes
 if [[ "$ANDROID_VERSION" == "android12" && "$KERNEL_VERSION" == "5.10" ]]; then
   fix_task_mmu_show_pad 209
 fi
 
-# Android 13 - 5.15 修复
+# Android 13 - 5.15 fixes
 if [[ "$ANDROID_VERSION" == "android13" && "$KERNEL_VERSION" == "5.15" ]]; then
   fix_task_mmu_show_pad 148 "2024-05"
 fi
 
-# Android 14 - 6.1 修复
+# Android 14 - 6.1 fixes
 if [[ "$ANDROID_VERSION" == "android14" && "$KERNEL_VERSION" == "6.1" ]]; then
   fix_task_mmu_show_pad 75 "2024-05"
 fi
 
-# Android 15 - 6.6 修复
+# Android 15 - 6.6 fixes
 if [[ "$ANDROID_VERSION" == "android15" && "$KERNEL_VERSION" == "6.6" ]]; then
-  # 修复老版 SukiSU 6.6.50~6.6.58: task_mmu.c 打入 SUSFS 后使用 vma，但旧源码没有对应声明
+  # Fix for older SukiSU 6.6.50~6.6.58: after SUSFS is applied to task_mmu.c, it uses vma, but the old source has no corresponding declaration.
   if [[ -n "$LEGACY_SUKISU_CONFIG" && "$CURRENT_SUB" -ge 50 && "$CURRENT_SUB" -le 58 ]] \
     && grep -qF 'vma = find_vma(mm, start_vaddr);' ./fs/proc/task_mmu.c; then
     TASK_MMU_PATCH="$KERNEL_PATCHES/wild/archived/susfs_fix_patches/v2.1.0/a15-6.6/task_mmu.c.patch"
     if [ ! -f "$TASK_MMU_PATCH" ]; then
-      echo "::error::补丁不存在: $TASK_MMU_PATCH"
+      echo "::error::Patch does not exist: $TASK_MMU_PATCH"
       exit 1
     fi
     cp "$TASK_MMU_PATCH" ./
     if patch -p1 --dry-run < task_mmu.c.patch >/dev/null 2>&1; then
       patch -p1 --no-backup-if-mismatch < task_mmu.c.patch
-      echo "已应用 Android 15 6.6.50~6.6.58 task_mmu.c 归档修复补丁"
+      echo "Applied the archived Android 15 6.6.50~6.6.58 task_mmu.c fix patch"
     else
-      echo "Android 15 6.6.50~6.6.58 task_mmu.c 归档修复补丁已应用或当前上下文不匹配，跳过"
+      echo "The archived Android 15 6.6.50~6.6.58 task_mmu.c fix patch is already applied or the current context does not match; skipping"
     fi
   fi
 fi
 
-# Android 16 - 6.12 修复
+# Android 16 - 6.12 fixes
 if [[ "$ANDROID_VERSION" == "android16" && "$KERNEL_VERSION" == "6.12" ]]; then
-  # SukiSU（LEGACY_SUKISU_CONFIG）与原生 KernelSU（CONFIG_KSU_MANUAL_HOOK）在 6.12 上
-  # 都会与 SUSFS 重复定义 setresuid hook，导致重复定义错误。
-  # 修复：当 SUSFS 启用时（CONFIG_KSU_SUSFS=y），跳过 KSU 侧的 setresuid hook 定义。
+  # On 6.12, SukiSU (LEGACY_SUKISU_CONFIG) and native KernelSU (CONFIG_KSU_MANUAL_HOOK)
+  # both define the setresuid hook alongside SUSFS, causing a redefinition error.
+  # Fix: skip the KSU-side setresuid hook definition when SUSFS is enabled (CONFIG_KSU_SUSFS=y).
   SETUID_HOOK="$KERNEL_ROOT/common/drivers/kernelsu/setuid_hook.c"
   if [[ -f "$SETUID_HOOK" ]] \
     && { [[ -n "$LEGACY_SUKISU_CONFIG" ]] || [[ "$KSU_VARIANT" == "KernelSU" ]]; } \
     && grep -qF 'defined(CONFIG_KSU_MANUAL_HOOK))' "$SETUID_HOOK"; then
     sed -i 's/defined(CONFIG_KSU_MANUAL_HOOK))/!defined(CONFIG_KSU_SUSFS) \&\& defined(CONFIG_KSU_MANUAL_HOOK))/' "$SETUID_HOOK"
-    echo "已修复 setuid_hook.c 重复定义问题（KSU 变体: ${KSU_VARIANT:-未知}）"
+    echo "Fixed the setuid_hook.c redefinition issue (KSU variant: ${KSU_VARIANT:-unknown})"
   fi
 fi
 
-# 守护：主补丁若再次因上下文漂移漏掉 susfs_def.h，在这里给出可读错误，
-# 而不是等到编译 fs/proc/task_mmu.c 时才报一串 SUSFS_IS_INODE_* 隐式声明
+# Guard: if context drift causes the main patch to miss susfs_def.h again, report a readable error here
+# instead of waiting for compilation of fs/proc/task_mmu.c to produce a series of SUSFS_IS_INODE_* implicit-declaration errors
 for SUSFS_SRC in fs/proc/task_mmu.c fs/namespace.c; do
   [[ -f "$SUSFS_SRC" ]] || continue
   if grep -qE 'SUSFS_IS_INODE_|CL_COPY_MNT_NS' "$SUSFS_SRC" \
     && ! grep -qF '#include <linux/susfs_def.h>' "$SUSFS_SRC"; then
-    echo "::error::$SUSFS_SRC 使用了 SUSFS 宏但缺少 linux/susfs_def.h，主补丁 hunk 未应用"
+    echo "::error::$SUSFS_SRC uses SUSFS macros but is missing linux/susfs_def.h; the main-patch hunk was not applied"
     exit 1
   fi
 done
